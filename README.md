@@ -194,7 +194,7 @@ Once sharded, the root `/TOKENME.txt` replaces its inline symbol list with expli
 === PROJECT IDENTITY ===
 NAME: enterprise-telemetry-monorepo
 STACK: TypeScript, Rust (WASM), PostgreSQL
-MODE: SHARDED_ROOT (Tokens: ~650 | Total Repo Symbols: 342)
+MODE: SHARDED_ROOT (Tokens: ~650 | Total Repo Symbols: 332)
 
 === GLOBAL ARCHITECTURAL INVARIANTS ===
 1. CROSS_BOUNDARY_CONTRACTS: Subsystems communicate strictly via typed protobuf schemas in /contracts.
@@ -204,7 +204,7 @@ MODE: SHARDED_ROOT (Tokens: ~650 | Total Repo Symbols: 342)
 /src/ingestion/TOKENME.txt   : [SHARD] High-frequency sensor telemetry parsers & ring buffers (84 symbols)
 /src/engine-wasm/TOKENME.txt : [SHARD] Rust kinematic & thermal solver bindings (62 symbols)
 /src/storage/TOKENME.txt     : [SHARD] PostgreSQL time-series adapters & migration runners (91 symbols)
-/src/web-ui/TOKENME.txt      : [SHARD] React dashboard views & state hooks (105 symbols)
+/src/web-ui/TOKENME.txt      : [SHARD] React dashboard views & state hooks (95 symbols)
 ```
 
 ---
