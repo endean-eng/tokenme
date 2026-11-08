@@ -5,7 +5,7 @@
 **Date:** November 2026  
 **Version:** 1.1 (Public Specification)  
 **License:** Creative Commons Attribution 4.0 International (CC-BY 4.0) / MIT Specification  
-**Canonical Repository:** `https://github.com/endean-eng/roo-prompt-debloater`  
+**Canonical Repository:** `https://github.com/endean-eng/tokenme`  
 **Web Mirror:** `https://deaninnovativedesign.com`
 
 ---
