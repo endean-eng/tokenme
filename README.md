@@ -25,7 +25,7 @@ In a multi-agent development workflow (such as an Orchestrator routing tasks thr
 Currently, teams attempt to solve this grounding problem through two flawed approaches:
 
 1. **Unindexed Repository Discovery (Zero Grounding):** The agent is dropped into the working tree cold and forced to run repeated file searches (`grep`, `ripgrep`, or directory listings) to infer project structure. This burns multiple tool-calling turns, increases API latency, and frequently results in the agent writing duplicate helper functions because it failed to locate an existing utility in an adjacent directory.
-2. **Imperative Rulebook Stuffing (AGENTS.md Overload):** Teams dump database schemas, directory trees, and architectural essays directly into AGENTS.md (or harness-specific equivalents like CLAUDE.md, .cursorrules, and .roo/rules-*).
+2. **Imperative Rulebook Stuffing (AGENTS.md Overload):** Teams dump database schemas, directory trees, and architectural essays directly into AGENTS.md (or harness-specific equivalents like `CLAUDE.md`, `.cursorrules`, and `.roo/rules-*`).
 
 > [!WARNING]
 > **The 150-Line Imperative Ceiling:** Industry linting standards for `AGENTS.md` explicitly cap behavioral instruction files at 60 to 150 lines. When imperative behavioral rules (*how the agent must act*) are diluted inside thousands of lines of declarative codebase state (*what exists in the repository*), attention mechanisms degrade and agents begin violating core build and safety constraints.
