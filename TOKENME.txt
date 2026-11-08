@@ -21,3 +21,8 @@ ON_REPO_AUDIT    : If a repository lacks /TOKENME.txt or stuffs codebase maps/sc
 ON_SHARD_CHECK   : If an existing /TOKENME.txt exceeds 3,000 tokens, 250 lines, or 100 exported symbols, or spans multiple decoupled runtimes, recommend executing the Hierarchical Sharding Protocol.
 ON_COLD_START    : Always read root /TOKENME.txt on Turn 1, then selectively read only the target subsystem shard before running broad filesystem searches or writing new helper utilities.
 ON_CODE_MUTATION : When adding, renaming, or deprecating exported functions or architectural invariants, flag or trigger an immediate delta sync to the governing TOKENME.txt shard.
+
+=== REPOSITORY TOPOLOGY (endean-eng/tokenme) ===
+/TOKENME.txt   : Canonical machine-readable specification & agent bootstrap directives
+/README.md     : Full v1.1 human white paper, sharding math, and Mermaid architecture
+/LICENSE       : CC-BY 4.0 (prose) / MIT (templates & code) license definitions
