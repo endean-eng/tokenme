@@ -25,7 +25,7 @@ In a multi-agent development workflow (such as an Orchestrator routing tasks thr
 Currently, teams attempt to solve this grounding problem through two flawed approaches:
 
 1. **Unindexed Repository Discovery (Zero Grounding):** The agent is dropped into the working tree cold and forced to run repeated file searches (`grep`, `ripgrep`, or directory listings) to infer project structure. This burns multiple tool-calling turns, increases API latency, and frequently results in the agent writing duplicate helper functions because it failed to locate an existing utility in an adjacent directory.
-2. **Imperative Rulebook Stuffing (`AGENTS.md` Overload):** Teams dump database schemas, directory trees, and architectural essays directly into `AGENTS.md` (or vendor-specific equivalents like `CLAUDE.md` and `.cursorrules`).
+2. **Imperative Rulebook Stuffing (AGENTS.md Overload):** Teams dump database schemas, directory trees, and architectural essays directly into AGENTS.md (or harness-specific equivalents like CLAUDE.md, .cursorrules, and .roo/rules-*).
 
 > [!WARNING]
 > **The 150-Line Imperative Ceiling:** Industry linting standards for `AGENTS.md` explicitly cap behavioral instruction files at 60 to 150 lines. When imperative behavioral rules (*how the agent must act*) are diluted inside thousands of lines of declarative codebase state (*what exists in the repository*), attention mechanisms degrade and agents begin violating core build and safety constraints.
@@ -36,7 +36,7 @@ Currently, teams attempt to solve this grounding problem through two flawed appr
 
 To eliminate semantic collision, repository documentation must be partitioned across three orthogonal axes based on the target consumer and linguistic mode:
 
-| Architectural Dimension | `README.md` | `AGENTS.md` (or `.roo` Mode Rules) | `TOKENME.txt` |
+| Architectural Dimension | `README.md` | `AGENTS.md` (Imperative Rules) | `TOKENME.txt` |
 | :--- | :--- | :--- | :--- |
 | **Primary Consumer** | Human Developers & Users | Agent Orchestrator & Tool Runner | LLM Context Window (Every Handoff) |
 | **Core Question Answered** | *"Why does this project exist and how do I install it?"* | *"How do I build, test, lint, and behave without breaking rules?"* | *"What is already built, how does state flow, and what functions sit on the shelf?"* |
@@ -44,7 +44,7 @@ To eliminate semantic collision, repository documentation must be partitioned ac
 | **File Format** | `.md` (GitHub Flavored Markdown) | `.md` (Markdown system prompt injection) | **`.txt`** (Unstyled raw ASCII/UTF-8 text) |
 | **Size Boundary** | Unbounded | Strictly capped (60 to 150 lines) | Strictly bounded per shard (1,500 to 3,000 tokens max) |
 | **Maintenance Lifecycle** | Manual updates at major releases | Manual curation by technical leads | **Live & Automated** (Updated on code mutation via build scripts) |
-| **Scaling Strategy** | Links to external `/docs` | Role-based splitting (`.roo/rules-*`) | Hierarchical directory sharding (`/src/module/TOKENME.txt`) |
+| **Scaling Strategy** | Links to external `/docs` | Role- or directory-scoped rules (AGENTS.md, .cursor/rules/*, .roo/rules-*) | Hierarchical directory sharding (`/src/module/TOKENME.txt`) |
 
 ---
 
@@ -172,7 +172,7 @@ MODE: MONOLITHIC (Tokens: ~420 | Symbols: 14)
 
 === ARCHITECTURAL INVARIANTS ===
 1. SCHEMA_AUTHORITY: All table schemas are defined strictly in /schema/core.json. Never hardcode DDL in application logic.
-2. STATE_CLEANUP: Ephemeral build plans in .roo/PLAN.md must be deleted upon Step 4 task termination.
+2. STATE_CLEANUP: Ephemeral build plans (e.g., PLAN.md) must be deleted upon task termination.
 3. ERROR_HANDLING: All external I/O must return Result<T, AppError> tuples; uncaught throws are prohibited in worker threads.
 
 === DIRECTORY TOPOLOGY ===
