@@ -1,4 +1,6 @@
 # TOKENME.txt: A Declarative State and Symbol Convention for Multi-Agent Software Repositories
+[![DOI](https://zenodo.org/badge/1450308700.svg)](https://doi.org/10.5281/zenodo.24117591)
+
 
 **Author:** Elijah N. Dean, BSME  
 **Organization:** Dean Innovative Design LLC  
