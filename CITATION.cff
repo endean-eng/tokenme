@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+title: "TOKENME.txt: A Declarative State and Symbol Convention for Multi-Agent Software Repositories"
+message: "If you use or reference the TOKENME.txt specification or Repository Context Triad, please cite it using the metadata below."
+type: software
+authors:
+  - family-names: Dean
+    given-names: Elijah N.
+    affiliation: Dean Innovative Design LLC
+doi: 10.5281/zenodo.24117591
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.24117591
+    description: "Zenodo Concept DOI (resolves to the latest release of the TOKENME.txt specification)"
+  - type: doi
+    value: 10.5281/zenodo.24117592
+    description: "Zenodo Version DOI for v1.1"
+repository-code: "https://github.com/endean-eng/tokenme"
+url: "https://deaninnovativedesign.com"
+license: CC-BY-4.0
+keywords:
+  - multi-agent-systems
+  - context-engineering
+  - declarative-state
+  - agents-md
+  - tokenme
