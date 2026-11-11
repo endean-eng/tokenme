@@ -1,0 +1,34 @@
+﻿# ============================================================================
+# TOKENME Repository .gitignore
+# ============================================================================
+
+# --- Python (tokenme-sync.py & tooling) ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Epistemic Isolation & Local Agent Scratchpads ---
+# Prevent local Roo Code state, active-briefs, and private IDRs from leaking
+.roo/
+.roomodes
+docs/internal/
+*IDR*.md
+*-idr-*.md
+*.bak
+*.tmp
+
+# --- Editor & OS Metadata ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+*[Ii][Dd][Rr]*.md
+docs/decisions/internal/
