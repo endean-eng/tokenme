@@ -1,10 +1,10 @@
 # TOKENME_VERSION: 2.0
-# STATE_ROOT: f5f912e4
+# STATE_ROOT: d14893a4
 # ADR_COUNT: 10
 
 # TOKENME.txt — Declarative Epistemic State & Merkle Router
 > **Repository:** `tokenme` | **Spec:** TOKENME v2.0 | **Last Synced:** 2026-11-11
-> **Coverage:** 19 files (18 code/doc, 1 opaque/PDF) | 3,501 LOC | 48 AST syms + 9 agent syms | ~75,276 conservative tokens
+> **Coverage:** 19 files (18 code/doc, 1 opaque/PDF) | 3,502 LOC | 48 AST syms + 9 agent syms | ~75,318 conservative tokens
 
 ## 1. L0 System Identity & Architectural Invariants
 - **Primary Runtimes:** Python >= 3.9 (Standard Library Only)
@@ -29,7 +29,7 @@
 ## 2. Federated Shard Router Table (`[SHARD_MOUNT]` — ADR-008 & ADR-009)
 | Scope | Shard Mount Path | Trigger Reason | Files | Child `STATE_ROOT` |
 | :--- | :--- | :--- | :--- | :--- |
-| `root (spillover)` | `./TOKENME.root-l2.txt` | `[SHARD_MOUNT | reason:ROOT_CEILING_EJECTION]` | 19 | `044aabe5` |
+| `root (spillover)` | `./TOKENME.root-l2.txt` | `[SHARD_MOUNT | reason:ROOT_CEILING_EJECTION]` | 19 | `cf0e6535` |
 
 ---
 ## [SELF-REFERENTIAL BOOTSTRAP & AGENT MAINTENANCE PROTOCOL]

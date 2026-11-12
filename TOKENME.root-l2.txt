@@ -1,5 +1,5 @@
 # TOKENME_VERSION: 2.0
-# STATE_ROOT: 044aabe5
+# STATE_ROOT: cf0e6535
 # ADR_COUNT: 10
 
 # TOKENME.root-l2.txt — Root Spillover L2 Shard
@@ -94,7 +94,7 @@
   - `sec 5_Opaque_Assets_And_L4_Sidecars` [L217-L262]: Pre-filter icon gate, hybrid SVG DOM+raster inspection, and in-place `.l3.txt` surrogate sidecars (`ADR-009`).
   - `sec 6_Reference_CLI_Synchronizer` [L264-L312]: Zero-dependency `tokenme-sync.py` architecture (`--init`, `--sync`, `--check`) and self-referential bootstrap protocol (`ADR-005`, `ADR-006`, `ADR-010`).
 
-### `tokenme-sync.py` [L1-L1893] (80.8 KiB | ~26562 conservative tokens)
+### `tokenme-sync.py` [L1-L1894] (80.9 KiB | ~26604 conservative tokens)
 - **Role & Invariants:** Zero-dependency Python >=3.9 CLI scaffolder, AST coordinate extractor, opaque/L4 `.l3.txt` sidecar manager, Two-Pass sharder, and Multi-Tier Merkle `STATE_ROOT` verifier (`ADR-001`..`ADR-010`).
 - **L2 Symbol Coordinates (Python AST):**
   - `def estimate_tokens` [L144-L153]: Computes token count via `tiktoken` (if present) or conservative char/3.5 heuristic with +15% safety buffer (`ADR-006`).
@@ -144,7 +144,7 @@
   - `def run_integrity_check` [L1529-L1605]: Tier 1 `<2ms` read-only Merkle and ADR leaf verification engine (`--check`, `ADR-008`).
   - `def atomic_commit_outputs` [L1608-L1651]: Atomic temp-file staging and `os.replace()` persistence with stale shard cleanup (`ADR-006`).
   - `def print_telemetry_receipt` [L1654-L1727]: [TODO: AGENT_FILL]
-  - `def main` [L1730-L1889]: CLI entrypoint handling `--init`, `--sync` (default), and `--check` workflows.
+  - `def main` [L1730-L1890]: CLI entrypoint handling `--init`, `--sync` (default), and `--check` workflows.
 
 ### `tokenme_v2_0_specification.md` [L1-L290] (28.8 KiB | ~9570 conservative tokens)
 - **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
