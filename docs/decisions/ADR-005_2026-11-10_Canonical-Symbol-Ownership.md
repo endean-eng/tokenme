@@ -1,6 +1,6 @@
 # ADR-005: Canonical Symbol Ownership, Qualified Class Scoping, and Cross-Shard Pointer Linking
 
-* **Status:** Accepted
+* **Status:** Implemented (Amended by ADR-010)
 * **Date:** 2026-11-10
 * **Context:** TOKENME v2.0 Specification & `init_tokenme.py` (v0.0.2)
 

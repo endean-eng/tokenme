@@ -1,6 +1,6 @@
 # ADR-001: Separation of the Repository Context Triad and `TOKENME.txt` Nomenclature
 
-* **Status:** Accepted
+* **Status:** Implemented
 * **Date:** 2026-11-08
 * **Component:** Core Specification (`TOKENME.txt` v1.1 / v2.0)
 

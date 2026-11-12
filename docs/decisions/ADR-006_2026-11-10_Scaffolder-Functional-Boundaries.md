@@ -1,6 +1,6 @@
 # ADR-006: Reference Scaffolder Functional Boundaries & Fail-Closed Filesystem Hardening
 
-* **Status:** Accepted
+* **Status:** Implemented (Amended by ADR-010)
 * **Date:** 2026-11-10
 * **Component:** `init_tokenme.py` (Reference CLI Bootstrapper)
 * **Supersedes / Refines:** Unbounded polyglot regex heuristics in early `v0.0.x` prototypes

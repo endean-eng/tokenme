@@ -1,6 +1,6 @@
 # ADR-004: Vertical Domain Sharding with Root L2 Eviction Over Horizontal Function Sharding
 
-* **Status:** Accepted
+* **Status:** Implemented (Partially Superseded by ADR-010)
 * **Date:** 2026-11-10
 * **Context:** TOKENME v2.0 Specification & `init_tokenme.py` Bootstrapper
 

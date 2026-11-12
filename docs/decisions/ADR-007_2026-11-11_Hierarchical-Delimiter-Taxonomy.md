@@ -1,7 +1,7 @@
 # ADR-007: Hierarchical Delimiter Decision Record Taxonomy
-* **Filename:** `ADR-007_2026-11-11_Hierarchical-Delimiter-Taxonomy.md`
+
 * **Date:** 2026-11-11
-* **Status:** Accepted
+* **Status:** Implemented (Amended by ADR-010)
 * **Subsystem:** Repository Taxonomy / Context Triad (`AGENTS.md`, `TOKENME.txt`, `tokenme-sync.py`)
 
 ### 1. Context & Problem Statement

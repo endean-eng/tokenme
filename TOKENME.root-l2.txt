@@ -1,0 +1,172 @@
+# TOKENME_VERSION: 2.0
+# STATE_ROOT: 044aabe5
+# ADR_COUNT: 10
+
+# TOKENME.root-l2.txt — Root Spillover L2 Shard
+> **Parent Router:** `./TOKENME.txt` | **Trigger:** `ROOT_CEILING_EJECTION` | **Last Synced:** 2026-11-11
+
+## Co-Located L1 File Invariants & L2 Symbol / Asset Digest
+
+### `docs/decisions/ADR-001_2026-11-08_Separation-Context-Triad.md` [L1-L21] (2.2 KiB | ~736 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `docs/decisions/ADR-002_2026-11-08_Plain-Text-Coordinate.md` [L1-L32] (3.8 KiB | ~1272 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `docs/decisions/ADR-003_2026-11-09_Hierarchical-Mimap-Sharding.md` [L1-L26] (2.1 KiB | ~694 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `docs/decisions/ADR-004_2026-11-10_Vertical-Domain-Sharding.md` [L1-L26] (3.1 KiB | ~1038 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `docs/decisions/ADR-005_2026-11-10_Canonical-Symbol-Ownership.md` [L1-L31] (3.8 KiB | ~1256 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `docs/decisions/ADR-006_2026-11-10_Scaffolder-Functional-Boundaries.md` [L1-L48] (5.7 KiB | ~1914 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `docs/decisions/ADR-007_2026-11-11_Hierarchical-Delimiter-Taxonomy.md` [L1-L54] (5.7 KiB | ~1915 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `docs/decisions/ADR-008_2026-11-11_Multi-Tier-Merkle.md` [L1-L180] (12.8 KiB | ~4305 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `docs/decisions/ADR-009_2026-11-11_Opaque-L4-Sidecars.md` [L1-L225] (16.3 KiB | ~5479 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `docs/decisions/ADR-010_2026-11-11_Ledger-Harmonization-Supersession.md` [L1-L102] (10.8 KiB | ~3612 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `.gitignore` [L1-L34] (0.7 KiB | ~214 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `AGENTS.md` [L1-L55] (5.9 KiB | ~1951 conservative tokens)
+- **Role & Invariants:** Authoritative imperative governance contract enforcing Context Triad boundaries, Turn-1 `STATE_ROOT` verification, 3-tuple ADR naming, Python AST vs. agent stub rules, and `L3`/`L4` opaque sidecar protocols.
+- **L2 Symbol Coordinates:**
+  - `sec 1_Context_Triad_And_Mipmap_Routing` [L7-L19]: Enforces `README.md` / `AGENTS.md` / `TOKENME.txt` separation, Turn-1 `STATE_ROOT` check, and `ADR-010` supersession authority.
+  - `sec 2_Decision_Record_Taxonomy_And_Merkle_Sync` [L23-L37]: Mandates `RecordID_ISODate_TitleSlug.md` grammar in `docs/adr/`, append-only status tagging, and `tokenme-sync.py` stdlib invariants.
+  - `sec 4_Opaque_Assets_L3_Sidecars_And_L4_Storage` [L50-L68]: Governs `[NEEDS_HYDRATION]`, flat PDF 5-page front-matter cap, `.l3.txt` header locks, and two-pass shard navigation.
+
+### `CITATION.cff` [L1-L25] (0.9 KiB | ~292 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `Complexity_&_Economics.md` [L1-L252] (25.4 KiB | ~8404 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `LICENSE` [L1-L28] (1.5 KiB | ~481 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `README.md` [L1-L179] (16.6 KiB | ~5536 conservative tokens)
+- **Role & Invariants:** Public v2.0 specification white paper, Context Triad rationale, Two-Pass Mipmap Sharding math (`<subdir>/TOKENME.<subsystem>.txt`), Multi-Tier Merkle verification cascade, Opaque/L4 `.l3.txt` sidecar protocol, and `tokenme-sync.py` CLI usage guide.
+- **L2 Symbol Coordinates:**
+  - `sec 1_Abstract_And_Problem` [L1-L48]: Context overload, blind `grep` tax, and the 150-line imperative ceiling on `AGENTS.md`.
+  - `sec 2_Repository_Context_Triad` [L50-L78]: Orthogonal partitioning across `README.md`, `AGENTS.md`, and `TOKENME.txt` (`ADR-001`, `ADR-002`).
+  - `sec 3_Hierarchical_Mipmap_Sharding` [L80-L168]: `L0`->`L4` resolution pyramid, Pass 1 (`<subdir>/TOKENME.<subsystem>.txt`) and Pass 2 (`TOKENME.root-l2.txt` / `.code` / `.assets`) triggers (`ADR-003`, `ADR-004`, `ADR-009`, `ADR-010`).
+  - `sec 4_Multi_Tier_Merkle_Verification` [L170-L215]: Cross-OS canonical byte normalization, 3-tuple `docs/adr/` leaf digests, and `<2ms` `STATE_ROOT` verification (`ADR-007`, `ADR-008`).
+  - `sec 5_Opaque_Assets_And_L4_Sidecars` [L217-L262]: Pre-filter icon gate, hybrid SVG DOM+raster inspection, and in-place `.l3.txt` surrogate sidecars (`ADR-009`).
+  - `sec 6_Reference_CLI_Synchronizer` [L264-L312]: Zero-dependency `tokenme-sync.py` architecture (`--init`, `--sync`, `--check`) and self-referential bootstrap protocol (`ADR-005`, `ADR-006`, `ADR-010`).
+
+### `tokenme-sync.py` [L1-L1893] (80.8 KiB | ~26562 conservative tokens)
+- **Role & Invariants:** Zero-dependency Python >=3.9 CLI scaffolder, AST coordinate extractor, opaque/L4 `.l3.txt` sidecar manager, Two-Pass sharder, and Multi-Tier Merkle `STATE_ROOT` verifier (`ADR-001`..`ADR-010`).
+- **L2 Symbol Coordinates (Python AST):**
+  - `def estimate_tokens` [L144-L153]: Computes token count via `tiktoken` (if present) or conservative char/3.5 heuristic with +15% safety buffer (`ADR-006`).
+  - `def canonical_bytes` [L156-L158]: Normalizes CRLF to LF and strips outer whitespace for cross-OS SHA-256 invariance (`ADR-008`).
+  - `def stream_sha256_hex` [L161-L170]: Computes streaming SHA-256 over binary assets in 64 KiB chunks (`ADR-009`).
+  - `class SymbolSpan` [L174-L188]: Dataclass storing qualified symbol kind, name, 1-based `[Lstart-Lend]` coordinates, and overload index (`ADR-005`).
+  - `def SymbolSpan.coord` [L183-L184]: [TODO: AGENT_FILL]
+  - `def SymbolSpan.unqualified_name` [L187-L188]: [TODO: AGENT_FILL]
+  - `class OpaqueAssetInfo` [L192-L204]: Dataclass storing modality, `L4_SOURCE_HASH`, page/dimension estimates, and `.l3.txt` sidecar state (`ADR-009`).
+  - `class FileRecord` [L208-L224]: Unified file manifest record for Python AST, non-Python stubs, and opaque/L4 assets.
+  - `class ADRRecord` [L228-L235]: Dataclass representing a parsed decision record in `docs/adr/` and its Merkle leaf hash (`ADR-007`, `ADR-008`).
+  - `class QuarantineEntry` [L239-L241]: Fault isolation log entry for symlinks, oversize text, or syntax/encoding errors (`ADR-006`).
+  - `class HarvestedFileState` [L245-L253]: Preserved state harvested from existing `TOKENME*.txt` shards during `--sync`.
+  - `class PythonASTExtractor` [L256-L313]: `ast.NodeVisitor` extracting top-level classes, qualified methods (`ClassName.method`), and `__init__.py` exports (`ADR-005`, `ADR-006`).
+  - `def PythonASTExtractor.__init__` [L259-L264]: [TODO: AGENT_FILL]
+  - `def PythonASTExtractor.visit_ClassDef` [L266-L274]: [TODO: AGENT_FILL]
+  - `def PythonASTExtractor._handle_function` [L276-L284]: [TODO: AGENT_FILL]
+  - `def PythonASTExtractor.visit_FunctionDef` [L286-L287]: [TODO: AGENT_FILL]
+  - `def PythonASTExtractor.visit_AsyncFunctionDef` [L289-L290]: [TODO: AGENT_FILL]
+  - `def PythonASTExtractor.visit_ImportFrom` [L292-L298]: [TODO: AGENT_FILL]
+  - `def PythonASTExtractor.visit_Assign` [L300-L313]: [TODO: AGENT_FILL]
+  - `def assign_overload_indices` [L316-L322]: Assigns sequential `overload_idx` values to prevent intra-file method collisions (`ADR-005`).
+  - `def parse_python_ast` [L325-L338]: Parses Python source via `ast.parse()` with fail-closed `SyntaxError` quarantine (`ADR-006`).
+  - `def _parse_raster_dimensions_and_meta` [L343-L392]: Zero-dependency binary header parser for PNG (`hdr[12:16] == b"IHDR"`), GIF, and JPEG dimensions (`ADR-009`, `ADR-010` ERR-01).
+  - `def inspect_opaque_candidate` [L395-L515]: Evaluates Pre-Filter Icon Gate, scrapes SVG DOM/PDF metadata, and computes L4 demotion (`ADR-009`).
+  - `def sync_l4_sidecar_file` [L518-L604]: Creates or verifies `<filename>.<ext>.l3.txt` sidecars and detects `STALE_BINARY_CHANGED` (`ADR-009`, `ADR-010` ERR-02).
+  - `def resolve_decisions_dir` [L609-L620]: Resolves canonical `docs/adr/` directory with fallback to `docs/decisions/` (`ADR-010` HC-03).
+  - `def parse_adr_metadata` [L623-L673]: Parses 3-tuple ADR filenames, status/supersession tags, and canonical leaf hashes (`ADR-007`, `ADR-008`, `ADR-010`).
+  - `def discover_adr_records` [L676-L704]: Scans and sorts all ADR files by POSIX path with birthday-collision detection (`ADR-008`).
+  - `def compute_merkle_state_root_from_text` [L707-L721]: Computes Merkle `STATE_ROOT` across normalized `AGENTS.md` and `MASKED_STATE_ROOT` payload (`ADR-008`).
+  - `def stamp_state_root_in_text` [L724-L730]: Stamps computed `STATE_ROOT` into shard header lines (`ADR-008`).
+  - `def load_ignore_patterns` [L735-L748]: [TODO: AGENT_FILL]
+  - `def is_ignored` [L751-L764]: [TODO: AGENT_FILL]
+  - `def detect_runtimes` [L767-L789]: [TODO: AGENT_FILL]
+  - `def scan_repository` [L792-L960]: Modality-first fail-closed directory traversal routing opaque assets before the 1 MiB text quarantine (`ADR-006`, `ADR-010` HC-06).
+  - `def find_existing_tokenme_shards` [L963-L973]: [TODO: AGENT_FILL]
+  - `def harvest_existing_state` [L976-L1087]: Harvests L0 metadata, L1 roles, L2 symbols, and hydrated opaque fields across root and subdirectory shards.
+  - `def merge_harvested_state` [L1090-L1125]: [TODO: AGENT_FILL]
+  - `def render_merkle_header_block` [L1130-L1137]: [TODO: AGENT_FILL]
+  - `def render_adr_index_section` [L1140-L1154]: [TODO: AGENT_FILL]
+  - `def render_single_file_l2_block` [L1157-L1218]: [TODO: AGENT_FILL]
+  - `def render_file_digest_section` [L1221-L1225]: [TODO: AGENT_FILL]
+  - `def render_quarantine_section` [L1228-L1241]: [TODO: AGENT_FILL]
+  - `def render_bootstrap_footer` [L1244-L1259]: [TODO: AGENT_FILL]
+  - `def evaluate_pass1_subdir_shard` [L1264-L1284]: Pass 1 subdirectory shard trigger evaluator (`OPAQUE_DENSITY`, `PROJECTED_L2_OVERFLOW`, `SYMBOL_COUNT`).
+  - `def build_documents` [L1287-L1524]: Two-Pass sharder (`<subdir>/TOKENME.<subsystem>.txt` + Pass 2 root ceiling ejection) and bottom-up Merkle rollup (`ADR-008`, `ADR-009`, `ADR-010` HC-02).
+  - `def run_integrity_check` [L1529-L1605]: Tier 1 `<2ms` read-only Merkle and ADR leaf verification engine (`--check`, `ADR-008`).
+  - `def atomic_commit_outputs` [L1608-L1651]: Atomic temp-file staging and `os.replace()` persistence with stale shard cleanup (`ADR-006`).
+  - `def print_telemetry_receipt` [L1654-L1727]: [TODO: AGENT_FILL]
+  - `def main` [L1730-L1889]: CLI entrypoint handling `--init`, `--sync` (default), and `--check` workflows.
+
+### `tokenme_v2_0_specification.md` [L1-L290] (28.8 KiB | ~9570 conservative tokens)
+- **Role & Invariants:** [TODO: AGENT_FILL - Summarize file responsibility & invariants]
+- **L2 Symbol Coordinates:**
+  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection.
+
+### `TOKENME_triad.png` [OPAQUE_L3] (582.4 KiB | RASTER_IMAGE | 2238x1157px | Hash: `5a6a4a1bbff3`)
+- **Asset_Class:** Schematic
+- **Meta_Context:** `NONE`
+- **Visual_Summary:** Architectural diagram illustrating the Repository Context Triad (`README.md` Narrative Layer, `AGENTS.md` Imperative Governance Layer, and `TOKENME.txt` Declarative Epistemic State Layer) and their orthogonal consumers.
+- **OCR_Payload:** `README.md (Human Narrative) | AGENTS.md (Imperative Rules) | TOKENME.txt (Declarative State & [Lstart-Lend] Symbol Coordinates)`
+
+---
+## [SELF-REFERENTIAL BOOTSTRAP & AGENT MAINTENANCE PROTOCOL]
+```yaml
+spec_version: 2.0
+scaffolder_version: 2.0.0
+topology_mode: ROOT_OVERFLOW_SHARD
+agent_execution_protocol:
+  1_MIPMAP_ROUTING: Read root TOKENME.txt (and check STATE_ROOT) BEFORE executing broad grep, find, or full-file reads.
+  2_SURGICAL_L3_READ: Use [Lstart-Lend] coordinates to issue bounded line-range reads; never ingest [L4_DEMOTED] binaries whole (read .l3.txt sidecar first).
+  3_NON_PYTHON_STUBS: Where `[AGENT_POPULATE_SYMBOLS]` appears, inspect the file once and populate `- `<kind> <Name>` [Lstart-Lend]: <summary>` entries.
+  4_HYDRATION_DUTY: Resolve `[TODO: AGENT_FILL]`, `[NEEDS_HYDRATION]`, and `[COORDS_STALE_CHECK]` markers in files/sidecars you touch.
+  5_MERKLE_SYNC: Run `python3 tokenme-sync.py` (or `--sync`) after edits to refresh AST coordinates, sidecar hashes, and Merkle STATE_ROOT (`--check` in CI).
+```

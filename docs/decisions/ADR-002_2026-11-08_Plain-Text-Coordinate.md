@@ -1,6 +1,6 @@
 # ADR-002: Plain-Text `.txt` Extension, `[Lstart-Lend]` Coordinate Grammar, and Self-Referential Bootstrap
 
-* **Status:** Accepted
+* **Status:** Implemented
 * **Date:** 2026-11-08 (Updated 2026-11-11)
 * **Component:** Core Specification (`TOKENME.txt` v1.1 / v2.0)
 

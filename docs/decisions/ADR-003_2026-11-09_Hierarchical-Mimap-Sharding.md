@@ -1,6 +1,6 @@
 # ADR-003: Hierarchical Mipmap Sharding Architecture and Hard Token Ceilings
 
-* **Status:** Accepted
+* **Status:** Implemented (Amended by ADR-010)
 * **Date:** 2026-11-09
 * **Component:** `TOKENME.txt` v2.0 Enterprise Epistemic Specification
 
