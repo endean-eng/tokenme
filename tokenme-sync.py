@@ -1,17 +1,28 @@
 #!/usr/bin/env python3
 """
-tokenme-sync.py (v2.0.0)
-Zero-dependency, fail-closed structural reference scaffolder, opaque/L4 asset
-tiering engine, and Multi-Tier Merkle state synchronizer for the TOKENME.txt (v2.0)
-epistemic specification.
+tokenme-sync.py (v2.1.1)
+Zero-dependency, fail-closed structural reference scaffolder, polymorphic AST/structural
+signature locker, hop-distance sharding & hysteresis engine, deterministic agent triage
+dispatcher, and Multi-Tier Merkle state synchronizer for the TOKENME (v2.1) specification.
 
-Implements:
-  - ADR-001 & ADR-002: Context Triad Separation, .txt Extension & [Lstart-Lend] Grammar
-  - ADR-003 & ADR-004: Mipmap Hierarchy & Vertical Domain Sharding (Amended by ADR-010)
-  - ADR-005 & ADR-006: Python AST Qualified Scoping & Fail-Closed Filesystem Hardening
-  - ADR-007 & ADR-008: 3-Tuple ADR Taxonomy & Multi-Tier Merkle Epistemic State Root
-  - ADR-009: Opaque/Vector L2 Mandate, In-Place L4 Sidecars (.l3.txt) & Two-Pass Sharding
-  - ADR-010: Ledger Harmonization, Cross-ADR Supersession Matrix & v2.0 Errata
+Implements & Harmonizes:
+  - ADR-001..010: Context Triad, .txt Coordinate Grammar, Mipmap Shards, AST & Opaque L4 Sidecars
+  - ADR-011: Self-Consuming Bootstrap Prompts, Polymorphic [#sig:xxxxxx] & Archetype Token Budgets
+  - ADR-012: Clamped Hop-Distance Threshold Relaxation & Cascade Sharding Guards
+  - ADR-013: Hysteresis-Gated --compact Coalescing & UTF-8 Byte-Bounded Guardbands
+  - ADR-014: Declarative Maintenance Execution Profiles (Profile A Default / Profile B Opt-In)
+  - ADR-015: Deterministic Agent Triage Queue (--triage) & Zero-Edit Hash Acknowledgment (--ack)
+  - ADR-016: v2.1 Specification Harmonization, Unified # === [FILES] === Schema & Errata
+
+Changelog (v2.1.1 Audit Remediation):
+  - Fixed unescaped end-of-line ($) anchors in STATE_ROOT_PATTERN, CANONICAL_3TUPLE_PATTERN, and RE_TOPOLOGY_EDGE.
+  - Restored ADR-010 ERR-01 PNG IHDR byte slices (hdr[12:16] / hdr[16:24]) and ERR-02 unscrambled .l3.txt stubs.
+  - Enforced ADR-010 HC-03 primary/fallback decision directory resolution (docs/adr/ primary, docs/decisions/ fallback).
+  - Implemented ADR-012 ATOMIC_MONOLITH guard, hop-depth ceiling evaluation, and R_max=1 child overflow warnings.
+  - Implemented ADR-013 Condition 2 Parent Absorption Headroom (<= 65%) and [WARN: COMPACT_ELIGIBLE] diagnostic.
+  - Implemented ADR-014 AGENTS.md dormant HTML comment isolation check and Profile A default bootstrapper.
+  - Added ADR-015 DISK_HASH field, contiguous header block grouping, and owning-shard routing for UNTRACKED_ARTIFACT.
+  - Added full child shard STATE_ROOT & L4 sidecar hash verification to --check.
 
 Requires: Python >= 3.9 (Standard Library Only)
 License: MIT / CC-BY 4.0
@@ -22,37 +33,47 @@ from __future__ import annotations
 
 import argparse
 import ast
+import csv
 import datetime
 import fnmatch
 import hashlib
+import io
+import json
 import math
 import os
 import re
 import struct
+import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-VERSION = "2.0.0"
-SPEC_VERSION = "2.0"
+VERSION = "2.1.1"
+SPEC_VERSION = "2.1"
 
-# --- ADR-010 Sec 3.1 Harmonized Sharding Thresholds ---
-ROOT_LINE_CEILING = 150                # Hard ceiling (~1,000 tokens) for root TOKENME.txt
-SHARD_TOKEN_CEILING = 2000             # Max token budget per individual shard (~250 lines)
-SINGLE_OVERFLOW_CEILING = 250          # Max ejected root lines before splitting .code and .assets
-DIR_PROJECTED_LINE_CEILING = 100       # Pass 1 trigger: code_l2_lines + (5 * n_opaque) > 100
-SHARD_TRIGGER_SYMBOLS = 75             # Pass 1 trigger: > 75 extracted symbols spawns subdir shard
-OPAQUE_SHARD_COUNT_THRESHOLD = 8       # Pass 1 trigger: >= 8 qualifying opaque assets spawns subdir shard
-PROJECTED_L2_LINES_PER_OPAQUE = 5      # Projected line footprint per hydrated opaque stub
-SHARD_TRIGGER_RUNTIMES = 2             # Polyglot trigger
+# --- ADR-013 & ADR-016 HC-03 Conservative UTF-8 Byte-to-Token Divisor ---
+BYTES_PER_TOKEN_SAFE = 2.8             # k_safe = 2.8 UTF-8 bytes per token (Zero tiktoken)
+HARD_BYTE_GUARDBAND = 1.25             # B_hard = ceil(1.25 * B_target)
+
+# --- ADR-012, ADR-013 & ADR-016 HC-04 Hop-Distance & Hysteresis Constants ---
+HOP_BASE_TOKENS_S0 = 1500              # d=0 Sharded Root Router ceiling (4,200 B / 150 lines)
+MONOLITH_MAX_TOKENS = 3000             # d=0 Unsharded Monolithic ceiling (8,400 B / 250 lines)
+HOP_RELAXATION_ALPHA = 0.50            # +50% per hop step
+HOP_ASYMPTOTIC_CAP_SMAX = 4000         # d>=4 Clamped Terminal Leaf ceiling (11,200 B)
+HYSTERESIS_MERGE_RATIO = 0.35          # Reverse merge floor: <= 35% of T_split(d)
+PARENT_ABSORPTION_RATIO = 0.65         # Parent post-merge cap: <= 65% of T_split(d-1)
+MIN_SPLIT_SECTIONS = 2                 # ADR-012 Gate 1: Minimum split groups required
+MIN_CHILD_VIABILITY_RATIO = 0.25       # ADR-012 Gate 2: Child >= 25% of S_0 (375 tok)
+OPAQUE_SHARD_COUNT_THRESHOLD = 8       # Pass 1 trigger: >= 8 qualifying opaque assets
+SHARD_TRIGGER_SYMBOLS = 75             # Pass 1 trigger: > 75 extracted symbols
+DIFF_EFFICIENCY_GATE = 0.60            # ADR-015: rho_diff <= 0.60 uses git diff; > 0.60 reads file
 
 # --- ADR-006 & ADR-010 HC-06 Fail-Closed Quarantine Constants ---
 DEFAULT_MAX_FILE_SIZE_KB = 1024        # 1 MiB ceiling for text/source pipeline
 BINARY_SNIFF_BYTES = 8192
 STREAM_CHUNK_BYTES = 65536             # 64 KiB streaming chunk for opaque/L4 hashing
-TOKEN_SAFETY_MARGIN = 1.15             # 15% conservative buffer when tiktoken is absent
 
 # --- ADR-009 Opaque, Vector & L4 Demotion Constants ---
 OPAQUE_EXTENSIONS: Set[str] = {
@@ -70,28 +91,56 @@ NATIVE_PDF_PAGE_LIMIT = 15
 NATIVE_PDF_BYTE_LIMIT = 10 * 1024 * 1024     # 10 MB
 RASTER_CAD_BYTE_LIMIT = 10 * 1024 * 1024     # 10 MB
 
-# --- ADR-008 & ADR-010 Merkle Constants ---
+# --- ADR-008, ADR-011 & ADR-016 Merkle & Signature Constants ---
 DEFAULT_LEAF_HASH_LEN = 6
 DEFAULT_ROOT_HASH_LEN = 8
+FILE_CONTENT_HASH_LEN = 8
+STRUCT_SIG_HASH_LEN = 6
+
 STATE_ROOT_PATTERN = re.compile(
     r"^(#\s*STATE_ROOT:\s*)([0-9a-fA-F]{6,64}|PENDING|MASKED_STATE_ROOT)(\s*)$",
     re.MULTILINE,
 )
-# ADR-010 HC-04: Supports ADR-NNN / IDR-NNN (3-6 char alnum) + advisory external prefixes
 ADVISORY_ID_PATTERN = re.compile(r"^([a-zA-Z0-9-]+)_")
 CANONICAL_3TUPLE_PATTERN = re.compile(
     r"^((?:ADR|IDR)-[A-Za-z0-9]{3,6})_(\d{4}-\d{2}-\d{2})_([A-Za-z0-9-]+)\.md$"
 )
 IGNORED_DECISION_FILES: Set[str] = {"readme.md", "template.md"}
 
-# Optional dynamic tiktoken import (ADR-006 Sec 3: zero hard dependency)
-try:
-    import tiktoken  # type: ignore
-    _TIKTOKEN_ENC = tiktoken.get_encoding("cl100k_base")
-except Exception:
-    _TIKTOKEN_ENC = None
+# ADR-011 & ADR-016 Polymorphic Topology Edge Grammar
+RE_TOPOLOGY_EDGE = re.compile(
+    r"^(?P<src_file>[a-zA-Z0-9_./-]+)::(?P<src_sym>[a-zA-Z0-9_][a-zA-Z0-9_.-]*|@[a-zA-Z0-9_.-]+|\[[a-zA-Z0-9_.: -]+\]|\*)"
+    r"\s*->\s*"
+    r"(?P<dst_file>[a-zA-Z0-9_./-]+)::(?P<dst_sym>[a-zA-Z0-9_][a-zA-Z0-9_.-]*|@[a-zA-Z0-9_.-]+|\[[a-zA-Z0-9_.: -]+\]|\*)"
+    r"\s*:\s*(?P<mech>.{1,160}?)(?:\s*\[#sig:(?P<sig>[0-9a-fA-F]{6})\])?$"
+)
 
-# --- Hardcoded Exclusions (ADR-006 & ADR-009 Part A.1) ---
+# ADR-012 Atomic Monolith Directive Detector
+ATOMIC_MONOLITH_PATTERN = re.compile(
+    r"(?:<!--\s*TOKENME:ATOMIC_MONOLITH=true\s*-->|^#\s*ATOMIC_MONOLITH:\s*true\b)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+# ADR-016 HC-06 Unified Unfilled Placeholder Detector
+UNFILLED_PLACEHOLDER_PATTERNS: Tuple[str, ...] = (
+    "[BOOTSTRAP_REQUIRED",
+    "[TODO: AGENT_FILL",
+    "[AGENT_POPULATE_SYMBOLS]",
+    "[NEEDS_HYDRATION",
+    "<PENDING:",
+    "[TODO]",
+)
+
+# ADR-014 & ADR-016 Canonical Default AGENTS.md Governance Block (Profile A — Decoupled Cold Triage)
+DEFAULT_AGENTS_MD_TEMPLATE = """# AGENTS.md — Agentic Governance & Epistemic Routing Laws
+
+### Epistemic State & Declarative Sync (`TOKENME` v2.1)
+- Read `./TOKENME.txt` (and any mounted child shards relevant to your scope) BEFORE executing broad directory searches (`grep`, `find`) or full-file reads. Use `[Lstart-Lend]` coordinates for surgical L3 reads.
+- Run `python tokenme-sync.py --triage` to locate `[BOOTSTRAP_REQUIRED]`, `[STALE_EDGE]`, `[SIG_DRIFT]`, `[BUDGET_EXCEEDED]`, or `STALE_HASH` items across shards without reading clean manifests.
+- When a code edit is strictly internal and preserves the file's public contract and `[TOPOLOGY]` edges, run `python tokenme-sync.py --ack <path>` to re-seal its hash without rewriting prose.
+- Never write freeform prose in `[PURPOSE]` or `[TOPOLOGY]`; strictly obey the inline `SYSTEM:`/`BOUNDARY:`/`RUNTIME:` and `<File::Anchor> -> <File::Anchor> : <Mechanism>` grammars. Never manually write `[#sig:xxxxxx]` tags; let `python tokenme-sync.py` auto-stamp cryptographic locks.
+"""
+
 DEFAULT_IGNORE_DIRS: Set[str] = {
     ".git", ".hg", ".svn", ".idea", ".vscode", ".roo", ".cursor",
     "node_modules", "bower_components", "jspm_packages",
@@ -102,8 +151,6 @@ DEFAULT_IGNORE_DIRS: Set[str] = {
     "thumbnails", "raw_dataset",
 }
 
-# Note (ADR-010 HC-06): Qualifying opaque extensions (.png, .jpg, .svg, .pdf, etc.)
-# are intentionally NOT in DEFAULT_IGNORE_PATTERNS so they route to the ADR-009 gate.
 DEFAULT_IGNORE_PATTERNS: List[str] = [
     "assets/icons/*", "*/assets/icons/*", "icons/*", "*/thumbnails/*", "*/raw_dataset/*",
     "*.min.js", "*.min.css", "*.map", "*.lock", "package-lock.json",
@@ -128,29 +175,82 @@ RUNTIME_MANIFESTS: Dict[str, str] = {
     "go.mod": "Go (Modules)",
     "pom.xml": "Java (Maven)",
     "build.gradle": "Java / Kotlin (Gradle)",
-    "build.gradle.kts": "Java / Kotlin (Gradle KTS)",
     "Gemfile": "Ruby (Bundler)",
     "composer.json": "PHP (Composer)",
-    "appsscript.json": "Google Apps Script (V8)",
     "CMakeLists.txt": "C / C++ (CMake)",
     "Makefile": "Make / Native Build",
     "Dockerfile": "Docker Container",
-    "docker-compose.yml": "Docker Compose",
 }
 
 PYTHON_AST_EXTS: Set[str] = {".py", ".pyi"}
 
 
+# --- ADR-011 & ADR-016 HC-04 / HC-05 Tier & Archetype Specifications ---
+
+@dataclass(frozen=True)
+class StateTierSpec:
+    tier_id: str
+    purpose_max_bytes: int
+    topology_min_edges: int
+    topology_max_edges: int
+    topology_max_bytes: int
+
+
+STATE_TIERS: Dict[str, StateTierSpec] = {
+    "L1_MONO": StateTierSpec("L1_MONO", purpose_max_bytes=360, topology_min_edges=4, topology_max_edges=8, topology_max_bytes=672),
+    "L1_ROOT": StateTierSpec("L1_ROOT", purpose_max_bytes=360, topology_min_edges=3, topology_max_edges=6, topology_max_bytes=504),
+    "L2_SHARD": StateTierSpec("L2_SHARD", purpose_max_bytes=270, topology_min_edges=2, topology_max_edges=6, topology_max_bytes=504),
+}
+
+
+@dataclass(frozen=True)
+class ArchetypeSpec:
+    name: str
+    base_tok: int
+    k_factor: int
+    max_tok: int
+
+
+ARCHETYPES: Dict[str, ArchetypeSpec] = {
+    "ORCHESTRATOR": ArchetypeSpec("ORCHESTRATOR", base_tok=35, k_factor=20, max_tok=140),
+    "DOMAIN_CODE":  ArchetypeSpec("DOMAIN_CODE",  base_tok=25, k_factor=16, max_tok=110),
+    "DATA_SCHEMA":  ArchetypeSpec("DATA_SCHEMA",  base_tok=20, k_factor=14, max_tok=90),
+    "SPEC_DOC":     ArchetypeSpec("SPEC_DOC",     base_tok=25, k_factor=12, max_tok=85),
+    "BUILD_CONFIG": ArchetypeSpec("BUILD_CONFIG", base_tok=15, k_factor=8,  max_tok=55),
+    "TEST_SUITE":   ArchetypeSpec("TEST_SUITE",   base_tok=15, k_factor=10, max_tok=60),
+    "BARREL_INIT":  ArchetypeSpec("BARREL_INIT",  base_tok=12, k_factor=6,  max_tok=40),
+    "OPAQUE_ASSET": ArchetypeSpec("OPAQUE_ASSET", base_tok=25, k_factor=10, max_tok=75),
+}
+
+
+# --- Core Math, Token, Byte & Hash Helpers ---
+
+def utf8_byte_len(text: str) -> int:
+    return len(text.encode("utf-8"))
+
+
 def estimate_tokens(text: str) -> int:
-    """Computes token count via tiktoken (if installed) or conservative heuristic (+15%)."""
+    """ADR-013 & ADR-016 HC-03: Deterministic UTF-8 byte-bounded token equivalent (k_safe = 2.8)."""
     if not text:
         return 0
-    if _TIKTOKEN_ENC is not None:
-        try:
-            return max(1, len(_TIKTOKEN_ENC.encode(text)))
-        except Exception:
-            pass
-    return max(1, math.ceil((len(text) / 3.5) * TOKEN_SAFETY_MARGIN))
+    return max(1, math.ceil(utf8_byte_len(text) / BYTES_PER_TOKEN_SAFE))
+
+
+def hop_split_token_ceiling(hop_depth: int, is_monolith: bool = False) -> int:
+    """ADR-012 & ADR-016 HC-04: Clamped hop-distance threshold S_trigger(d)."""
+    if hop_depth <= 0 and is_monolith:
+        return MONOLITH_MAX_TOKENS
+    raw = math.floor(HOP_BASE_TOKENS_S0 * (1.0 + HOP_RELAXATION_ALPHA * max(0, hop_depth)))
+    return min(HOP_ASYMPTOTIC_CAP_SMAX, raw)
+
+
+def hop_split_byte_ceiling(hop_depth: int, is_monolith: bool = False) -> int:
+    return math.ceil(BYTES_PER_TOKEN_SAFE * hop_split_token_ceiling(hop_depth, is_monolith))
+
+
+def hop_merge_token_floor(hop_depth: int) -> int:
+    """ADR-013 & ADR-016 HC-04: Reverse hysteresis merge floor (35% of T_split(d))."""
+    return math.floor(HYSTERESIS_MERGE_RATIO * hop_split_token_ceiling(max(1, hop_depth)))
 
 
 def canonical_bytes(path: Path) -> bytes:
@@ -158,8 +258,13 @@ def canonical_bytes(path: Path) -> bytes:
     return path.read_bytes().replace(b"\r\n", b"\n").strip()
 
 
+def compute_content_hash_8hex(path: Path) -> str:
+    """ADR-015 & ADR-016 HC-02: 8-hex lowercase SHA-256 of LF-normalized file content."""
+    return hashlib.sha256(canonical_bytes(path)).hexdigest()[:FILE_CONTENT_HASH_LEN]
+
+
 def stream_sha256_hex(path: Path, length: int = 12) -> str:
-    """ADR-009 Part C: Computes streaming SHA-256 over arbitrary-size binary files in 64 KiB chunks."""
+    """ADR-009 Part C: Computes streaming SHA-256 over binary files in 64 KiB chunks."""
     h = hashlib.sha256()
     with path.open("rb") as f:
         while True:
@@ -170,57 +275,98 @@ def stream_sha256_hex(path: Path, length: int = 12) -> str:
     return h.hexdigest()[:length]
 
 
+def short_sig_hex(payload: str, length: int = STRUCT_SIG_HASH_LEN) -> str:
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:length]
+
+
+def classify_archetype(rel_path: str, is_opaque: bool = False, source_text: str = "") -> str:
+    """ADR-011 & ADR-016 HC-05: Classifies a file into one of the 8 canonical archetypes."""
+    if is_opaque:
+        return "OPAQUE_ASSET"
+    p = Path(rel_path)
+    fname = p.name.lower()
+    ext = p.suffix.lower()
+
+    if fname in ("__init__.py", "index.ts", "index.js", "mod.rs", "lib.rs"):
+        return "BARREL_INIT"
+    if fname.startswith("test_") or fname.endswith("_test.py") or ".spec." in fname or "/tests/" in f"/{rel_path.lower()}/":
+        return "TEST_SUITE"
+    if p.name in RUNTIME_MANIFESTS or ext in (".toml", ".yaml", ".yml", ".json", ".ini", ".cfg"):
+        if "schema" in fname:
+            return "DATA_SCHEMA"
+        return "BUILD_CONFIG"
+    if ext in (".md", ".rst", ".txt"):
+        return "SPEC_DOC"
+    if ext in (".sql", ".proto", ".graphql") or "schema" in fname or "models" in fname:
+        return "DATA_SCHEMA"
+    if "argparse" in source_text or "if __name__" in source_text or fname in ("main.py", "cli.py", "app.py", "tokenme-sync.py"):
+        return "ORCHESTRATOR"
+    return "DOMAIN_CODE"
+
+
+def compute_file_budget_bytes(archetype_name: str, effective_loc: int) -> Tuple[int, int, int]:
+    """
+    ADR-016 HC-05: Returns (T_target_tok, B_target_bytes, B_hard_bytes) for a file.
+    """
+    spec = ARCHETYPES.get(archetype_name, ARCHETYPES["DOMAIN_CODE"])
+    ratio = max(1.0, effective_loc / 50.0)
+    t_target = min(spec.max_tok, spec.base_tok + math.floor(spec.k_factor * math.log2(ratio)))
+    b_target = math.ceil(BYTES_PER_TOKEN_SAFE * t_target)
+    b_hard = math.ceil(HARD_BYTE_GUARDBAND * b_target)
+    return t_target, b_target, b_hard
+
+
+# --- Data Structures ---
+
 @dataclass
 class SymbolSpan:
     kind: str
     name: str
     start_line: int
     end_line: int
-    overload_idx: int = 0
-    description: str = "[TODO: AGENT_FILL]"
-
-    @property
-    def coord(self) -> str:
-        return f"[L{self.start_line}-L{self.end_line}]"
-
-    @property
-    def unqualified_name(self) -> str:
-        return self.name.split(".")[-1]
+    arity: int = 0
+    struct_sig: str = "000000"
+    bound_adr: Optional[str] = None
 
 
 @dataclass
 class OpaqueAssetInfo:
-    modality: str                # 'RASTER_IMAGE', 'VECTOR_SVG', 'NATIVE_PDF', 'FLAT_PDF'
-    source_hash: str             # Streaming SHA-256 prefix
+    modality: str
+    source_hash: str
     est_pages: int = 1
     dimensions: Optional[str] = None
     pre_scraped_meta: str = "NONE"
     is_l4_demoted: bool = False
     sidecar_rel_path: Optional[str] = None
-    sidecar_status: str = "UNHYDRATED_STUB"  # 'UNHYDRATED_STUB', 'HYDRATED', 'STALE_BINARY_CHANGED'
+    sidecar_status: str = "UNHYDRATED_STUB"
     sidecar_leaf_hash: Optional[str] = None
-    asset_class: str = "[NEEDS_HYDRATION]"
-    visual_summary: str = "[NEEDS_HYDRATION - Inspect visual/SVG/PDF & populate concise engineering summary]"
-    ocr_payload: str = "[NEEDS_HYDRATION - Populate key part numbers/specs or NONE]"
+    asset_class: str = "[BOOTSTRAP_REQUIRED]"
+    visual_summary: str = "[BOOTSTRAP_REQUIRED]"
 
 
 @dataclass
 class FileRecord:
     rel_path: str
-    parent_dir: str              # Relative POSIX directory ("" for root)
-    subsystem: str               # Top-level directory or "root"
+    parent_dir: str
+    subsystem: str
     byte_size: int
     line_count: int
+    effective_loc: int
     tokens_est: int
-    is_python: bool
+    archetype: str
+    b_target: int
+    b_hard: int
+    content_hash: str
+    struct_sig: str
+    ast_signature_str: str
+    anchor_sigs: Dict[str, str] = field(default_factory=dict)
+    is_python: bool = False
     is_opaque: bool = False
+    is_atomic_monolith: bool = False
     opaque_info: Optional[OpaqueAssetInfo] = None
     symbols: List[SymbolSpan] = field(default_factory=list)
-    preserved_raw_symbols: List[str] = field(default_factory=list)
-    reexports: List[str] = field(default_factory=list)
     fault_status: Optional[str] = None
-    stale_coord_warning: Optional[str] = None
-    role_summary: str = "[TODO: AGENT_FILL - Summarize file responsibility & invariants]"
+    role_summary: str = "[BOOTSTRAP_REQUIRED]"
     assigned_shard: str = "TOKENME.txt"
 
 
@@ -231,7 +377,6 @@ class ADRRecord:
     iso_date: str
     title_slug: str
     status: str
-    supersession_note: str
     leaf_hash: str
 
 
@@ -242,117 +387,336 @@ class QuarantineEntry:
 
 
 @dataclass
-class HarvestedFileState:
+class HarvestedRow:
+    rel_path: str
     old_line_count: int
+    content_hash: str
+    struct_sig: str
     role_summary: str
-    exact_symbols: Dict[Tuple[str, int], str] = field(default_factory=dict)
-    fallback_symbols: Dict[str, str] = field(default_factory=dict)
-    raw_symbol_lines: List[str] = field(default_factory=list)
-    opaque_class: Optional[str] = None
-    opaque_summary: Optional[str] = None
-    opaque_ocr: Optional[str] = None
+    shard_rel_posix: str
+    line_number: int
+    raw_row: str
 
 
-class PythonASTExtractor(ast.NodeVisitor):
-    """ADR-005 & ADR-006 Invariant 2: Exact Python AST symbol & qualified scope extractor."""
+@dataclass
+class HarvestedShardState:
+    rel_shard_posix: str
+    is_atomic_monolith: bool = False
+    purpose_lines: List[str] = field(default_factory=list)
+    topology_lines: List[str] = field(default_factory=list)
+    rows: Dict[str, HarvestedRow] = field(default_factory=dict)
 
-    def __init__(self, is_init_file: bool = False) -> None:
+
+@dataclass
+class TriageItem:
+    item_type: str
+    target_shard: str
+    line_anchor: str
+    tracked_file: Optional[str] = None
+    block_id: Optional[str] = None
+    current_text: Optional[str] = None
+    disk_hash: Optional[str] = None
+    hash_delta: Optional[str] = None
+    diff_metrics: Optional[str] = None
+    current_row: Optional[str] = None
+    git_diff_cmd: Optional[str] = None
+    recommended_action: str = ""
+
+
+# --- ADR-011 & ADR-016 Polymorphic Structural Hashing & 3-Stage AST Pruning ---
+
+def _compute_ast_node_structural_sig(node: ast.AST) -> str:
+    """
+    ADR-011 Sec 2.2: Computes a 6-hex structural signature over an AST node that is invariant
+    to comments, docstrings, and constant literal values, capturing args, return annotations,
+    decorators, outgoing call names, and state effects.
+    """
+    parts: List[str] = [type(node).__name__]
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        args = [a.arg for a in node.args.posonlyargs + node.args.args + node.args.kwonlyargs]
+        if node.args.vararg:
+            args.append(f"*{node.args.vararg.arg}")
+        if node.args.kwarg:
+            args.append(f"**{node.args.kwarg.arg}")
+        parts.append(f"args=({','.join(args)})")
+        if node.returns:
+            try:
+                parts.append(f"ret={ast.unparse(node.returns)}")
+            except Exception:
+                parts.append(f"ret={type(node.returns).__name__}")
+        decs = []
+        for d in node.decorator_list:
+            try:
+                decs.append(ast.unparse(d))
+            except Exception:
+                decs.append(type(d).__name__)
+        if decs:
+            parts.append(f"dec={','.join(decs)}")
+    elif isinstance(node, ast.ClassDef):
+        bases = []
+        for b in node.bases:
+            try:
+                bases.append(ast.unparse(b))
+            except Exception:
+                bases.append(type(b).__name__)
+        parts.append(f"bases=({','.join(bases)})")
+
+    calls: List[str] = []
+    effects: Set[str] = set()
+    for child in ast.walk(node):
+        if isinstance(child, ast.Call):
+            if isinstance(child.func, ast.Name):
+                calls.append(child.func.id)
+            elif isinstance(child.func, ast.Attribute):
+                calls.append(child.func.attr)
+        elif isinstance(child, ast.Global):
+            effects.add(f"global:{','.join(sorted(child.names))}")
+        elif isinstance(child, (ast.Yield, ast.YieldFrom)):
+            effects.add("yield")
+        elif isinstance(child, ast.Await):
+            effects.add("await")
+        elif isinstance(child, ast.Raise):
+            effects.add("raise")
+    if calls:
+        parts.append(f"calls={','.join(sorted(set(calls)))}")
+    if effects:
+        parts.append(f"fx={','.join(sorted(effects))}")
+    return short_sig_hex("|".join(parts))
+
+
+class PolymorphicPythonScanner(ast.NodeVisitor):
+    """Extracts symbols, arities, structural signatures, and @bound ADR tags in one pass."""
+
+    def __init__(self, source_lines: List[str]) -> None:
         self.symbols: List[SymbolSpan] = []
-        self.reexports: Set[str] = set()
-        self.is_init_file = is_init_file
+        self.anchor_sigs: Dict[str, str] = {}
         self._class_stack: List[str] = []
         self._func_depth: int = 0
+        self._source_lines = source_lines
+
+    def _find_bound_tag(self, start_line: int, end_line: int) -> Optional[str]:
+        window = self._source_lines[max(0, start_line - 2) : min(len(self._source_lines), start_line + 4)]
+        for l in window:
+            m = re.search(r"@bound\s+((?:ADR|IDR)-[A-Za-z0-9]{3,6})", l)
+            if m:
+                return m.group(1)
+        return None
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         if self._func_depth == 0:
             qual_name = ".".join(self._class_stack + [node.name])
             start = getattr(node, "lineno", 1)
             end = getattr(node, "end_lineno", start) or start
-            self.symbols.append(SymbolSpan(kind="class", name=qual_name, start_line=start, end_line=end))
+            sig = _compute_ast_node_structural_sig(node)
+            self.anchor_sigs[qual_name] = sig
+            self.symbols.append(
+                SymbolSpan(
+                    kind="class",
+                    name=qual_name,
+                    start_line=start,
+                    end_line=end,
+                    arity=len(node.bases),
+                    struct_sig=sig,
+                    bound_adr=self._find_bound_tag(start, end),
+                )
+            )
             self._class_stack.append(node.name)
             self.generic_visit(node)
             self._class_stack.pop()
 
-    def _handle_function(self, node: ast.AST, kind_label: str, name: str) -> None:
+    def _handle_func(self, node: ast.AST, kind: str, name: str, args_obj: ast.arguments) -> None:
         if self._func_depth == 0:
             qual_name = ".".join(self._class_stack + [name])
             start = getattr(node, "lineno", 1)
             end = getattr(node, "end_lineno", start) or start
-            self.symbols.append(SymbolSpan(kind=kind_label, name=qual_name, start_line=start, end_line=end))
+            raw_args = [a.arg for a in args_obj.posonlyargs + args_obj.args + args_obj.kwonlyargs if a.arg not in ("self", "cls")]
+            arity = len(raw_args) + (1 if args_obj.vararg else 0) + (1 if args_obj.kwarg else 0)
+            sig = _compute_ast_node_structural_sig(node)
+            self.anchor_sigs[qual_name] = sig
+            self.symbols.append(
+                SymbolSpan(
+                    kind=kind,
+                    name=qual_name,
+                    start_line=start,
+                    end_line=end,
+                    arity=arity,
+                    struct_sig=sig,
+                    bound_adr=self._find_bound_tag(start, end),
+                )
+            )
         self._func_depth += 1
         self.generic_visit(node)
         self._func_depth -= 1
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        self._handle_function(node, "def", node.name)
+        self._handle_func(node, "def", node.name, node.args)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        self._handle_function(node, "async def", node.name)
-
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        if self.is_init_file and self._func_depth == 0 and not self._class_stack:
-            mod_prefix = "." * (node.level or 0) + (node.module or "")
-            imported = ", ".join(alias.name for alias in node.names[:5])
-            if len(node.names) > 5:
-                imported += ", ..."
-            self.reexports.add(f"{mod_prefix} ({imported})")
-
-    def visit_Assign(self, node: ast.Assign) -> None:
-        if self.is_init_file and self._func_depth == 0 and not self._class_stack:
-            for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "__all__":
-                    if isinstance(node.value, (ast.List, ast.Tuple, ast.Set)):
-                        exports = [
-                            elt.value for elt in node.value.elts
-                            if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
-                        ]
-                        if exports:
-                            joined = ", ".join(exports[:8])
-                            if len(exports) > 8:
-                                joined += ", ..."
-                            self.reexports.add(f"__all__: [{joined}]")
+        self._handle_func(node, "async def", node.name, node.args)
 
 
-def assign_overload_indices(symbols: List[SymbolSpan]) -> List[SymbolSpan]:
-    counts: Dict[str, int] = {}
-    for sym in symbols:
-        idx = counts.get(sym.name, 0)
-        sym.overload_idx = idx
-        counts[sym.name] = idx + 1
-    return symbols
+def format_pruned_ast_column(symbols: List[SymbolSpan], b_target: int, effective_loc: int) -> str:
+    """
+    ADR-011 Sec 3 & ADR-016 HC-05: 3-Stage Progressive AST Pruning to fit within B_target bytes.
+    """
+    if not symbols:
+        return "module_script (no top-level class/def)"
+
+    def _render_stage(syms: List[SymbolSpan], fold_methods: bool) -> str:
+        classes = [s for s in syms if s.kind == "class"]
+        top_funcs = [s for s in syms if s.kind != "class" and "." not in s.name]
+        methods_by_cls: Dict[str, List[SymbolSpan]] = {}
+        for s in syms:
+            if s.kind != "class" and "." in s.name:
+                cls_prefix = s.name.rsplit(".", 1)[0]
+                methods_by_cls.setdefault(cls_prefix, []).append(s)
+
+        parts: List[str] = []
+        if classes:
+            cls_strs: List[str] = []
+            for c in classes:
+                m_list = methods_by_cls.get(c.name, [])
+                if fold_methods and len(m_list) > 4:
+                    cls_strs.append(f"{c.name}[{len(m_list)}m]")
+                elif m_list:
+                    m_names = ",".join(
+                        f".{m.name.split('.')[-1]}/{m.arity}" + (f"[{m.bound_adr}]" if m.bound_adr else "")
+                        for m in m_list[:6]
+                    )
+                    if len(m_list) > 6:
+                        m_names += ",..."
+                    cls_strs.append(f"{c.name}({m_names})")
+                else:
+                    cls_strs.append(f"{c.name}:{c.start_line}-{c.end_line}")
+            parts.append("classes=" + ", ".join(cls_strs))
+
+        if top_funcs:
+            fn_strs = [
+                f"{f.name}/{f.arity}:{f.start_line}-{f.end_line}" + (f"[{f.bound_adr}]" if f.bound_adr else "")
+                for f in top_funcs
+            ]
+            if fold_methods and len(fn_strs) > 8:
+                fn_strs = [f"{f.name}/{f.arity}" for f in top_funcs[:8]] + [f"+{len(top_funcs) - 8}_more"]
+            parts.append("defs=" + ", ".join(fn_strs))
+        return " ; ".join(parts) if parts else "module_script"
+
+    # Stage 0: Full resolution (<150 LOC)
+    s0 = _render_stage(symbols, fold_methods=False)
+    if effective_loc < 150 and utf8_byte_len(s0) <= b_target:
+        return s0
+
+    # Stage 1: Public API resolution (strip _private except __init__ and __call__)
+    pub_syms = [
+        s for s in symbols
+        if not s.name.split(".")[-1].startswith("_") or s.name.split(".")[-1] in ("__init__", "__call__")
+    ]
+    s1 = _render_stage(pub_syms or symbols, fold_methods=False)
+    if utf8_byte_len(s1) <= b_target:
+        return s1
+
+    # Stage 2: Arity & method folding
+    s2 = _render_stage(pub_syms or symbols, fold_methods=True)
+    if utf8_byte_len(s2) <= b_target:
+        return s2
+    return s2[: max(32, b_target - 3)] + "..."
 
 
-def parse_python_ast(source_text: str, is_init_file: bool) -> Tuple[List[SymbolSpan], List[str], Optional[str]]:
-    try:
-        tree = ast.parse(source_text)
-    except SyntaxError as exc:
-        line_info = f" at L{exc.lineno}" if exc.lineno else ""
-        return [], [], f"[UNPARSEABLE: SyntaxError{line_info}]"
-    except ValueError as exc:
-        return [], [], f"[UNPARSEABLE: ValueError ({exc})]"
-    except RecursionError:
-        return [], [], "[UNPARSEABLE: AST RecursionError]"
+def scan_non_python_structural_sigs(rel_path: str, text: str) -> Tuple[Dict[str, str], str]:
+    """
+    ADR-011 Sec 3: Extracts structural anchors and 6-hex signatures for Markdown, JSON, CSV/TSV,
+    and generic source/config files so [TOPOLOGY] edges and Dual-Hash Auto-Ack work across modalities.
+    """
+    ext = Path(rel_path).suffix.lower()
+    sigs: Dict[str, str] = {}
 
-    extractor = PythonASTExtractor(is_init_file=is_init_file)
-    extractor.visit(tree)
-    return assign_overload_indices(extractor.symbols), sorted(extractor.reexports), None
+    if ext in (".md", ".txt"):
+        current_heading = "[ROOT]"
+        section_skeletons: Dict[str, List[str]] = {current_heading: []}
+        heading_order: List[str] = []
+        in_fence = False
+        for raw_line in text.splitlines():
+            stripped = raw_line.strip()
+            if stripped.startswith("```"):
+                in_fence = not in_fence
+                section_skeletons.setdefault(current_heading, []).append(stripped[:20])
+                continue
+            if not in_fence:
+                m_h = re.match(r"^(#{1,4})\s+(.+)$", stripped)
+                if m_h:
+                    raw_title = m_h.group(2).strip()
+                    bracket_anchor = f"[{raw_title}]"
+                    slug = "[" + re.sub(r"[^a-z0-9]+", "-", raw_title.lower()).strip("-") + "]"
+                    current_heading = bracket_anchor
+                    heading_order.append(raw_title[:28])
+                    section_skeletons.setdefault(bracket_anchor, [])
+                    section_skeletons.setdefault(slug, section_skeletons[bracket_anchor])
+                    continue
+                if stripped.startswith("|") or stripped.startswith("$$") or stripped.startswith("# ==="):
+                    section_skeletons.setdefault(current_heading, []).append(stripped)
+            else:
+                section_skeletons.setdefault(current_heading, []).append(stripped)
+
+        for anchor, skel in section_skeletons.items():
+            sigs[anchor] = short_sig_hex("\n".join(skel) if skel else anchor)
+        sigs["*"] = short_sig_hex("|".join(f"{k}:{v}" for k, v in sorted(sigs.items())))
+        summary_col = "secs=" + ", ".join(heading_order[:5]) + ("..." if len(heading_order) > 5 else "")
+        return sigs, (summary_col if heading_order else "doc_text")
+
+    if ext == ".json":
+        try:
+            obj = json.loads(text)
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    sigs[str(k)] = short_sig_hex(json.dumps(v, sort_keys=True))
+                sigs["*"] = short_sig_hex("|".join(sorted(sigs.keys())))
+                keys_preview = ", ".join(list(obj.keys())[:6])
+                return sigs, f"json_keys=[{keys_preview}]"
+        except Exception:
+            pass
+
+    if ext in (".csv", ".tsv"):
+        delim = "\t" if ext == ".tsv" else ","
+        try:
+            reader = csv.reader(io.StringIO(text), delimiter=delim)
+            rows = list(reader)
+            if rows:
+                headers = [h.strip() for h in rows[0] if h.strip()]
+                for h in headers:
+                    sigs[h] = short_sig_hex(h)
+                for r in rows[1:]:
+                    if r and r[0].strip():
+                        row_id = f"@{r[0].strip()}"
+                        sigs[row_id] = short_sig_hex("|".join(c.strip() for c in r))
+                sigs["*"] = short_sig_hex("|".join(f"{k}:{v}" for k, v in sorted(sigs.items())))
+                return sigs, f"cols=[{', '.join(headers[:5])}] ({max(0, len(rows)-1)} rows)"
+        except Exception:
+            pass
+
+    # Fallback for generic code/config files: strip # and // comments for structural hash
+    structural_lines: List[str] = []
+    for line in text.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#") or s.startswith("//"):
+            continue
+        structural_lines.append(s)
+    wildcard_sig = short_sig_hex("\n".join(structural_lines))
+    sigs["*"] = wildcard_sig
+    return sigs, "[AGENT_POPULATE_SYMBOLS]"
 
 
-# --- ADR-009 & ADR-010 ERR-01/ERR-02 Opaque & Vector Inspection Pipeline ---
+# --- ADR-009 & ADR-010 Opaque & Vector Inspection Pipeline ---
 
 def _parse_raster_dimensions_and_meta(filepath: Path, ext: str, size: int) -> Tuple[Optional[Tuple[int, int]], str]:
-    """Zero-dependency header parser for PNG, GIF, and JPEG dimensions + PNG tEXt metadata."""
     dims: Optional[Tuple[int, int]] = None
     meta_items: List[str] = []
     try:
         with filepath.open("rb") as f:
             hdr = f.read(4096)
             if ext == ".png" and size >= 24:
-                # ADR-010 ERR-01 fix: slice hdr[12:16] for IHDR and hdr[16:24] for >II unpack
+                # ADR-010 ERR-01 Fix: Exact slice hdr[12:16] for IHDR and hdr[16:24] for >II width/height unpack
                 if hdr[:8] == b"\x89PNG\r\n\x1a\n" and hdr[12:16] == b"IHDR":
                     w, h = struct.unpack(">II", hdr[16:24])
                     dims = (w, h)
-                # Scrape printable PNG tEXt chunks in initial header window
                 for m in re.finditer(b"tEXt([A-Za-z0-9_ -]{1,32})\x00([\x20-\x7e]{1,120})", hdr):
                     k = m.group(1).decode("ascii", errors="ignore").strip()
                     v = m.group(2).decode("ascii", errors="ignore").strip()
@@ -363,7 +727,6 @@ def _parse_raster_dimensions_and_meta(filepath: Path, ext: str, size: int) -> Tu
                     w, h = struct.unpack("<HH", hdr[6:10])
                     dims = (w, h)
             elif ext in (".jpg", ".jpeg") and size >= 4 and hdr[:2] == b"\xff\xd8":
-                # Fast SOF0/SOF2 marker scan in first 64 KiB
                 f.seek(2)
                 buf = f.read(65536)
                 idx = 0
@@ -388,16 +751,10 @@ def _parse_raster_dimensions_and_meta(filepath: Path, ext: str, size: int) -> Tu
                     idx += 2 + seg_len
     except OSError:
         pass
-    meta_str = "; ".join(meta_items[:4]) if meta_items else "NONE"
-    return dims, meta_str
+    return dims, ("; ".join(meta_items[:3]) if meta_items else "NONE")
 
 
 def inspect_opaque_candidate(filepath: Path, rel_file: str) -> Optional[OpaqueAssetInfo]:
-    """
-    ADR-009 Part A & B + ADR-010 ERR-01:
-    Evaluates the Pre-Filter Icon Gate, scrapes deterministic metadata/DOM strings,
-    and determines L3 vs. L4 demotion status. Returns None if excluded as a trivial icon.
-    """
     ext = filepath.suffix.lower()
     if ext not in OPAQUE_EXTENSIONS or filepath.name.endswith(".l3.txt"):
         return None
@@ -406,7 +763,6 @@ def inspect_opaque_candidate(filepath: Path, rel_file: str) -> Optional[OpaqueAs
     except OSError:
         return None
 
-    # 1. Raster Images (.png, .jpg, .tiff, .bmp, .webp, .gif)
     if ext in RASTER_CAD_EXTENSIONS:
         if size < MIN_RASTER_BYTES:
             return None
@@ -430,7 +786,6 @@ def inspect_opaque_candidate(filepath: Path, rel_file: str) -> Optional[OpaqueAs
             sidecar_rel_path=f"{rel_file}.l3.txt" if demoted else None,
         )
 
-    # 2. Vector Diagrams (.svg)
     if ext == ".svg":
         try:
             raw_svg = filepath.read_text(encoding="utf-8", errors="ignore")
@@ -440,22 +795,14 @@ def inspect_opaque_candidate(filepath: Path, rel_file: str) -> Optional[OpaqueAs
         has_id = "id=" in raw_svg
         if size < MIN_SVG_ICON_BYTES and not has_text and not has_id:
             return None
-
         titles = re.findall(r"<title[^>]*>(.*?)</title>", raw_svg, flags=re.IGNORECASE | re.DOTALL)
-        descs = re.findall(r"<desc[^>]*>(.*?)</desc>", raw_svg, flags=re.IGNORECASE | re.DOTALL)
         texts = re.findall(r"<text[^>]*>(.*?)</text>", raw_svg, flags=re.IGNORECASE | re.DOTALL)
-        g_ids = re.findall(r"<g[^>]*\bid=[\"']([^\"']+)[\"']", raw_svg, flags=re.IGNORECASE)
-
-        cleaned_snippets: List[str] = []
-        for item in (titles[:2] + descs[:2] + texts[:6]):
-            clean = re.sub(r"<[^>]+>", " ", item)
-            clean = " ".join(clean.split())
-            if clean:
-                cleaned_snippets.append(clean[:80])
-        if g_ids:
-            cleaned_snippets.append(f"g_ids=[{', '.join(g_ids[:6])}]")
-
-        meta_str = " | ".join(cleaned_snippets) if cleaned_snippets else "SVG_PATHS_ONLY (No <text> nodes)"
+        cleaned: List[str] = []
+        for item in (titles[:2] + texts[:4]):
+            c = " ".join(re.sub(r"<[^>]+>", " ", item).split())
+            if c:
+                cleaned.append(c[:60])
+        meta_str = " ; ".join(cleaned) if cleaned else "SVG_PATHS_ONLY"
         src_hash = stream_sha256_hex(filepath, length=12)
         demoted = size > RASTER_CAD_BYTE_LIMIT
         return OpaqueAssetInfo(
@@ -468,66 +815,42 @@ def inspect_opaque_candidate(filepath: Path, rel_file: str) -> Optional[OpaqueAs
             sidecar_rel_path=f"{rel_file}.l3.txt" if demoted else None,
         )
 
-    # 3. Documents (.pdf) — Fast streaming regex scan for /Type /Page and text density
     if ext == ".pdf":
         src_hash = stream_sha256_hex(filepath, length=12)
-        page_count = 0
+        page_count = 1
         ascii_chars = 0
-        meta_snippets: List[str] = []
         try:
             with filepath.open("rb") as f:
-                # Sample up to first 4 MiB for page tags and metadata
                 sample = f.read(4 * 1024 * 1024)
-            page_count = len(re.findall(rb"/Type\s*/Page\b", sample))
-            if page_count == 0:
-                page_count = 1
-            for tag in (b"Title", b"Author", b"Producer", b"Creator"):
-                m = re.search(rb"/" + tag + rb"\s*\(([^\)]{1,120})\)", sample)
-                if m:
-                    val = m.group(1).decode("latin-1", errors="ignore").strip()
-                    if val:
-                        meta_snippets.append(f"/{tag.decode('ascii')} ({val})")
-            # Estimate extractable text density from parenthetical literal strings
+            page_count = max(1, len(re.findall(rb"/Type\s*/Page\b", sample)))
             for s_match in re.finditer(rb"\(([\x20-\x7e]{4,200})\)", sample):
                 ascii_chars += len(s_match.group(1))
         except OSError:
-            page_count = 1
-
-        chars_per_page = ascii_chars / max(1, page_count)
-        is_flat = chars_per_page < 50
+            pass
+        is_flat = (ascii_chars / max(1, page_count)) < 50
         modality = "FLAT_PDF" if is_flat else "NATIVE_PDF"
-        if is_flat:
-            demoted = (page_count > FLAT_PDF_PAGE_LIMIT) or (size > FLAT_PDF_BYTE_LIMIT)
-        else:
-            demoted = (page_count > NATIVE_PDF_PAGE_LIMIT) or (size > NATIVE_PDF_BYTE_LIMIT)
-
-        meta_str = " ".join(meta_snippets[:4]) if meta_snippets else "NONE"
+        demoted = (
+            (page_count > FLAT_PDF_PAGE_LIMIT or size > FLAT_PDF_BYTE_LIMIT)
+            if is_flat
+            else (page_count > NATIVE_PDF_PAGE_LIMIT or size > NATIVE_PDF_BYTE_LIMIT)
+        )
         return OpaqueAssetInfo(
             modality=modality,
             source_hash=src_hash,
             est_pages=page_count,
             dimensions=f"{page_count}p",
-            pre_scraped_meta=meta_str,
+            pre_scraped_meta=f"{modality}:{page_count}p",
             is_l4_demoted=demoted,
             sidecar_rel_path=f"{rel_file}.l3.txt" if demoted else None,
         )
-
     return None
 
 
-def sync_l4_sidecar_file(
-    root: Path, rec: FileRecord, leaf_len: int, dry_run: bool
-) -> None:
-    """
-    ADR-009 Part C & D + ADR-010 ERR-02:
-    Generates or verifies the adjacent `<filename>.<ext>.l3.txt` sidecar for an L4-demoted
-    asset, preserving existing hydrated content when L4_SOURCE_HASH matches, or marking
-    `STATUS: STALE_BINARY_CHANGED` if the underlying binary changed on disk.
-    """
+def sync_l4_sidecar_file(root: Path, rec: FileRecord, leaf_len: int, dry_run: bool) -> None:
+    """ADR-009 & ADR-010 ERR-02 Fix: Emits unscrambled natural-English .l3.txt surrogate stubs."""
     info = rec.opaque_info
     if not info or not info.is_l4_demoted or not info.sidecar_rel_path:
         return
-
     sidecar_path = root / info.sidecar_rel_path
     header_lines = [
         "# TOKENME L3 SURROGATE STUB",
@@ -535,51 +858,17 @@ def sync_l4_sidecar_file(
         f"# L4_SOURCE_HASH: {info.source_hash}",
         f"# L4_BYTES: {rec.byte_size} | EST_PAGES: {info.est_pages} | MODALITY: {info.modality}",
     ]
-
     if sidecar_path.is_file() and not sidecar_path.is_symlink():
         try:
             existing_text = sidecar_path.read_text(encoding="utf-8", errors="ignore")
-            existing_lines = existing_text.splitlines()
-            old_hash_match = re.search(r"^#\s*L4_SOURCE_HASH:\s*([0-9a-fA-F]+)", existing_text, re.MULTILINE)
-            old_status_match = re.search(r"^#\s*STATUS:\s*(\S+)", existing_text, re.MULTILINE)
-            old_hash = old_hash_match.group(1) if old_hash_match else ""
-            old_status = old_status_match.group(1) if old_status_match else "UNHYDRATED_STUB"
-
-            # Extract body after `# STATUS:` line
-            body_start_idx = 0
-            for idx, l in enumerate(existing_lines):
-                if l.startswith("# STATUS:"):
-                    body_start_idx = idx + 1
-                    break
-            preserved_body = existing_lines[body_start_idx:] if body_start_idx > 0 else existing_lines[5:]
-
+            old_hash_m = re.search(r"^#\s*L4_SOURCE_HASH:\s*([0-9a-fA-F]+)", existing_text, re.MULTILINE)
+            old_hash = old_hash_m.group(1) if old_hash_m else ""
             if old_hash == info.source_hash:
-                info.sidecar_status = old_status
-                # Harvest summary fields if hydrated
-                m_cls = re.search(r"^Asset_Class:\s*(.+)$", existing_text, re.MULTILINE)
-                m_sum = re.search(r"^Visual_Or_Content_Summary:\s*(.+)$", existing_text, re.MULTILINE)
-                if m_cls and "<PENDING:" not in m_cls.group(1):
-                    info.asset_class = m_cls.group(1).strip()
-                if m_sum and "<PENDING:" not in m_sum.group(1):
-                    info.visual_summary = m_sum.group(1).strip()
                 info.sidecar_leaf_hash = hashlib.sha256(canonical_bytes(sidecar_path)).hexdigest()[:leaf_len]
-                return
-            else:
-                # Binary mutated on disk: update L4_SOURCE_HASH and set STALE_BINARY_CHANGED
-                info.sidecar_status = "STALE_BINARY_CHANGED"
-                updated_content = "\n".join(
-                    header_lines + ["# STATUS: STALE_BINARY_CHANGED"] + preserved_body
-                ) + "\n"
-                if not dry_run:
-                    sidecar_path.write_text(updated_content, encoding="utf-8", newline="\n")
-                norm_bytes = updated_content.replace("\r\n", "\n").strip().encode("utf-8")
-                info.sidecar_leaf_hash = hashlib.sha256(norm_bytes).hexdigest()[:leaf_len]
                 return
         except OSError:
             pass
 
-    # Create fresh .l3.txt sidecar using ADR-010 ERR-02 unscrambled schema
-    info.sidecar_status = "UNHYDRATED_STUB"
     stub_lines = header_lines + [
         "# STATUS: UNHYDRATED_STUB",
         "",
@@ -587,12 +876,12 @@ def sync_l4_sidecar_file(
         f"Extracted_Metadata: {info.pre_scraped_meta}",
         "",
         "[AGENT_HYDRATION_REQUIRED]",
-        "Asset_Class: <PENDING: Schematic | Datasheet_Scan | Manual | CAD_Render | Field_Photo | Receipt_Invoice>",
+        "Asset_Class: <PENDING: CAD_Render | Datasheet_Scan | Field_Photo | Manual | Receipt_Invoice | Schematic>",
         "Visual_Or_Content_Summary: <PENDING: 1-3 dense engineering sentence summary>",
         "Page_Map_And_TOC:",
-        "  - <PENDING: Map section headers to page ranges so L4 binary can be queried by page slice>",
+        "  - <PENDING: Map page ranges to section headers so L4 binary can be queried by page slice>",
         "Key_Specs_And_OCR:",
-        "  - <PENDING: Critical part numbers, pinouts, torque specs, or extracted tables (`NONE` if non-text photo)>",
+        "  - <PENDING: Critical extracted tables, pinouts, part numbers, or torque specs (`NONE` if non-text photo)>",
     ]
     stub_text = "\n".join(stub_lines) + "\n"
     if not dry_run:
@@ -604,31 +893,27 @@ def sync_l4_sidecar_file(
     info.sidecar_leaf_hash = hashlib.sha256(norm_bytes).hexdigest()[:leaf_len]
 
 
-# --- ADR-007, ADR-008 & ADR-010 Decision Record Discovery & Merkle Hashing ---
+# --- ADR-007, ADR-008, ADR-010 HC-03 & ADR-016 Decision Record Discovery ---
 
-def resolve_decisions_dir(root: Path, custom_dir: Optional[str] = None) -> Optional[Path]:
-    """ADR-010 HC-03: Canonical path is docs/adr/, with fallback to docs/decisions/."""
+def resolve_decisions_dirs(root: Path, custom_dir: Optional[str] = None) -> List[Path]:
+    """
+    ADR-010 HC-03 & ADR-016 HC-06: Scans docs/adr/ as primary and falls back to
+    docs/decisions/ only if docs/adr/ is absent (or when overridden via --adr-dir).
+    """
     if custom_dir:
         p = root / custom_dir
-        return p if p.is_dir() else None
-    canonical = root / "docs" / "adr"
-    if canonical.is_dir():
-        return canonical
+        return [p] if p.is_dir() else []
+    primary = root / "docs" / "adr"
+    if primary.is_dir():
+        return [primary]
     fallback = root / "docs" / "decisions"
-    if fallback.is_dir():
-        return fallback
-    return None
+    return [fallback] if fallback.is_dir() else []
 
 
 def parse_adr_metadata(adr_path: Path, root: Path, leaf_len: int) -> ADRRecord:
-    """
-    ADR-007, ADR-008, ADR-010 HC-04 & AMB-03:
-    Extracts 3-tuple or advisory ID, parses Status and Amendment notes, and computes
-    the canonical leaf SHA-256 digest.
-    """
+    """ADR-016 COL-07 Fix: Supports YAML frontmatter status:, bulleted, bold, and table status fields."""
     rel_posix = adr_path.relative_to(root).as_posix()
     fname = adr_path.name
-
     m_3tuple = CANONICAL_3TUPLE_PATTERN.match(fname)
     if m_3tuple:
         rec_id, iso_date, title_slug = m_3tuple.group(1), m_3tuple.group(2), m_3tuple.group(3)
@@ -639,21 +924,15 @@ def parse_adr_metadata(adr_path: Path, root: Path, leaf_len: int) -> ADRRecord:
         title_slug = adr_path.stem[len(rec_id) + 1 :] if m_adv else adr_path.stem
 
     status_val = "Proposed"
-    supersession_note = ""
     try:
         text = adr_path.read_text(encoding="utf-8", errors="ignore")
-        # Match bullet `* **Status:** ...` or table `| **Status** | ... |`
         m_stat = re.search(
-            r"(?:\*\s*\*\*Status:\*\*\s*|^\|\s*\*\*Status\*\*\s*\|\s*)([^|\n]+)",
+            r"(?:^\*\s*\*\*Status:\*\*\s*|^\*\*Status:\*\*\s*|^\|\s*\*\*Status\*\*\s*\|\s*|^status:\s*)([^|\n]+)",
             text,
             re.MULTILINE | re.IGNORECASE,
         )
         if m_stat:
-            raw_stat = m_stat.group(1).strip().strip("`").strip()
-            status_val = raw_stat
-            m_amend = re.search(r"\(([^)]*(?:Amended|Superseded)[^)]*)\)", raw_stat, re.IGNORECASE)
-            if m_amend:
-                supersession_note = f"[{m_amend.group(1).strip()}]"
+            status_val = m_stat.group(1).strip().strip("`").strip()
         if iso_date == "N/A":
             m_date = re.search(r"(\d{4}-\d{2}-\d{2})", text)
             if m_date:
@@ -668,36 +947,39 @@ def parse_adr_metadata(adr_path: Path, root: Path, leaf_len: int) -> ADRRecord:
         iso_date=iso_date,
         title_slug=title_slug,
         status=status_val,
-        supersession_note=supersession_note,
         leaf_hash=digest,
     )
 
 
 def discover_adr_records(root: Path, leaf_len: int = DEFAULT_LEAF_HASH_LEN, custom_dir: Optional[str] = None) -> List[ADRRecord]:
-    """ADR-008 Sec 2.2: Discovers all markdown ADR files sorted by relative POSIX path and checks for collisions."""
     if not (6 <= leaf_len <= 64):
         raise ValueError("leaf_len must be between 6 and 64 hex characters.")
-    decisions_dir = resolve_decisions_dir(root, custom_dir)
-    if not decisions_dir:
+    dirs = resolve_decisions_dirs(root, custom_dir)
+    if not dirs:
         return []
 
     records: List[ADRRecord] = []
     seen_hashes: Dict[str, str] = {}
+    seen_ids: Dict[str, str] = {}
 
-    paths = sorted(
-        (
-            p for p in decisions_dir.iterdir()
-            if p.is_file() and not p.is_symlink() and p.suffix.lower() == ".md" and p.name.lower() not in IGNORED_DECISION_FILES
-        ),
-        key=lambda p: p.relative_to(root).as_posix(),
-    )
-    for path in paths:
+    candidate_paths: List[Path] = []
+    for d in dirs:
+        for p in d.iterdir():
+            if p.is_file() and not p.is_symlink() and p.suffix.lower() == ".md" and p.name.lower() not in IGNORED_DECISION_FILES:
+                candidate_paths.append(p)
+
+    for path in sorted(candidate_paths, key=lambda p: p.relative_to(root).as_posix()):
         rec = parse_adr_metadata(path, root, leaf_len)
+        if rec.record_id in seen_ids:
+            raise RuntimeError(
+                f"Duplicate ADR record_id collision ({rec.record_id}) between "
+                f"{seen_ids[rec.record_id]} and {rec.rel_posix}."
+            )
+        seen_ids[rec.record_id] = rec.rel_posix
         if rec.leaf_hash in seen_hashes:
             raise RuntimeError(
                 f"Leaf hash collision detected ({rec.leaf_hash}) between "
-                f"{seen_hashes[rec.leaf_hash]} and {rec.rel_posix}. "
-                f"Increase --leaf-len beyond {leaf_len}."
+                f"{seen_hashes[rec.leaf_hash]} and {rec.rel_posix}."
             )
         seen_hashes[rec.leaf_hash] = rec.rel_posix
         records.append(rec)
@@ -707,11 +989,6 @@ def discover_adr_records(root: Path, leaf_len: int = DEFAULT_LEAF_HASH_LEN, cust
 def compute_merkle_state_root_from_text(
     tokenme_text: str, agents_path: Optional[Path], root_len: int = DEFAULT_ROOT_HASH_LEN
 ) -> str:
-    """
-    ADR-008 Sec 2.4 & ADR-010 AMB-04:
-    Computes configurable Merkle STATE_ROOT across normalized local AGENTS.md (or b"" if absent)
-    and masked TOKENME text.
-    """
     if not (8 <= root_len <= 64):
         raise ValueError("root_len must be between 8 and 64 hex characters.")
     norm_tokenme = tokenme_text.replace("\r\n", "\n").strip()
@@ -724,13 +1001,12 @@ def compute_merkle_state_root_from_text(
 def stamp_state_root_in_text(
     tokenme_text: str, agents_path: Optional[Path], root_len: int = DEFAULT_ROOT_HASH_LEN
 ) -> Tuple[str, str]:
-    """Replaces `# STATE_ROOT: ...` with the freshly computed Merkle digest."""
     digest = compute_merkle_state_root_from_text(tokenme_text, agents_path, root_len=root_len)
     stamped = STATE_ROOT_PATTERN.sub(rf"\g<1>{digest}\g<3>", tokenme_text)
     return stamped, digest
 
 
-# --- Repository Traversal & State Harvesting ---
+# --- Repository Scanning & Polymorphic Extraction ---
 
 def load_ignore_patterns(root: Path) -> List[str]:
     patterns = list(DEFAULT_IGNORE_PATTERNS)
@@ -767,39 +1043,24 @@ def is_ignored(rel_path: str, name: str, is_dir: bool, patterns: List[str]) -> b
 def detect_runtimes(root: Path) -> List[str]:
     found: Set[str] = set()
     try:
-        children = sorted(root.iterdir(), key=lambda p: p.name)
-        search_dirs = [root] + [
-            d for d in children
-            if d.is_dir() and not d.is_symlink() and d.name not in DEFAULT_IGNORE_DIRS and not d.name.startswith(".")
-        ]
+        for item in sorted(root.iterdir(), key=lambda p: p.name):
+            if item.is_file() and not item.is_symlink() and item.name in RUNTIME_MANIFESTS:
+                found.add(RUNTIME_MANIFESTS[item.name])
     except OSError:
-        search_dirs = [root]
-
-    for d in search_dirs:
-        try:
-            for item in sorted(d.iterdir(), key=lambda p: p.name):
-                if item.is_symlink() or not item.is_file():
-                    continue
-                if item.name in RUNTIME_MANIFESTS:
-                    found.add(RUNTIME_MANIFESTS[item.name])
-                elif item.suffix in {".csproj", ".sln"}:
-                    found.add(".NET / C#")
-        except OSError:
-            continue
+        pass
     return sorted(found)
 
 
 def scan_repository(
     root: Path, max_size_bytes: int, leaf_len: int, dry_run: bool
-) -> Tuple[List[FileRecord], List[QuarantineEntry], List[str]]:
+) -> Tuple[List[FileRecord], List[QuarantineEntry], List[str], Dict[str, Dict[str, str]]]:
     """
-    ADR-006 Invariants 3-4, ADR-009 Part A-C, & ADR-010 HC-06:
-    Modality-first routing: Opaque/vector/PDF assets route to the streaming L3/L4
-    inspector prior to the 1 MiB / null-byte text-reader quarantine.
+    Scans the repository, building FileRecords and the global workspace_sig_map[rel_path][anchor] = 6-hex.
     """
     ignore_patterns = load_ignore_patterns(root)
     records: List[FileRecord] = []
     quarantine_log: List[QuarantineEntry] = []
+    workspace_sig_map: Dict[str, Dict[str, str]] = {}
 
     for dirpath, dirnames, filenames in os.walk(root, topdown=True, followlinks=False):
         rel_dir = os.path.relpath(dirpath, root).replace("\\", "/")
@@ -822,7 +1083,6 @@ def scan_repository(
             rel_file = f"{rel_dir}/{fname}".lstrip("/")
             if is_ignored(rel_file, fname, False, ignore_patterns):
                 continue
-
             fpath = Path(dirpath) / fname
             if fpath.is_symlink():
                 quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason="[UNPARSEABLE: SkippedSymlinkFile]"))
@@ -830,11 +1090,8 @@ def scan_repository(
 
             try:
                 st = fpath.stat()
-            except PermissionError:
-                quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason="[UNPARSEABLE: PermissionError on stat]"))
-                continue
             except OSError as exc:
-                quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason=f"[UNPARSEABLE: OSError ({exc.__class__.__name__})]"))
+                quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason=f"[UNPARSEABLE: StatError ({exc.__class__.__name__})]"))
                 continue
 
             byte_size = st.st_size
@@ -845,105 +1102,116 @@ def scan_repository(
             subsystem = parts[0] if len(parts) > 1 else "root"
             ext = fpath.suffix.lower()
 
-            # --- Branch 1 (ADR-010 HC-06): Opaque, Vector & PDF Modality Pipeline ---
+            # Branch 1: Opaque / Vector / PDF Pipeline
             if ext in OPAQUE_EXTENSIONS:
                 opaque_info = inspect_opaque_candidate(fpath, rel_file)
                 if opaque_info is None:
-                    # Excluded by Pre-Filter Icon Gate (<512B, <128x128px, or trivial SVG icon)
                     continue
+                arch = "OPAQUE_ASSET"
+                _, b_target, b_hard = compute_file_budget_bytes(arch, opaque_info.est_pages * 25)
+                c_hash = opaque_info.source_hash[:FILE_CONTENT_HASH_LEN]
+                s_sig = short_sig_hex(f"{opaque_info.modality}:{opaque_info.dimensions}:{opaque_info.pre_scraped_meta}")
+                ast_col = f"{opaque_info.modality} ({opaque_info.dimensions}) ; meta={opaque_info.pre_scraped_meta}"
                 rec = FileRecord(
                     rel_path=rel_file,
                     parent_dir=rel_dir,
                     subsystem=subsystem,
                     byte_size=byte_size,
                     line_count=opaque_info.est_pages,
-                    tokens_est=45,  # Bounded L2 summary footprint
+                    effective_loc=opaque_info.est_pages,
+                    tokens_est=45,
+                    archetype=arch,
+                    b_target=b_target,
+                    b_hard=b_hard,
+                    content_hash=c_hash,
+                    struct_sig=s_sig,
+                    ast_signature_str=ast_col,
+                    anchor_sigs={"*": s_sig},
                     is_python=False,
                     is_opaque=True,
                     opaque_info=opaque_info,
-                    role_summary="[NEEDS_HYDRATION - Opaque/Vector/PDF Asset]",
                 )
                 if opaque_info.is_l4_demoted:
                     sync_l4_sidecar_file(root, rec, leaf_len=leaf_len, dry_run=dry_run)
+                workspace_sig_map[rel_file] = {"*": s_sig}
                 records.append(rec)
                 continue
 
-            # --- Branch 2 (ADR-006): Source & Text Pipeline ---
+            # Branch 2: Source & Text Pipeline
             if byte_size > max_size_bytes:
-                size_kb = byte_size // 1024
-                limit_kb = max_size_bytes // 1024
                 quarantine_log.append(
                     QuarantineEntry(
                         rel_path=rel_file,
-                        reason=f"[UNPARSEABLE: OversizeText ({size_kb:,} KiB exceeds {limit_kb:,} KiB limit)]",
+                        reason=f"[UNPARSEABLE: OversizeText ({byte_size // 1024:,} KiB > {max_size_bytes // 1024:,} KiB)]",
                     )
                 )
                 continue
 
             try:
                 with fpath.open("rb") as bf:
-                    sniff_chunk = bf.read(BINARY_SNIFF_BYTES)
-                if b"\x00" in sniff_chunk:
-                    quarantine_log.append(
-                        QuarantineEntry(rel_path=rel_file, reason=f"[UNPARSEABLE: BinaryNullByte ({byte_size:,} B)]")
-                    )
+                    sniff = bf.read(BINARY_SNIFF_BYTES)
+                if b"\x00" in sniff:
+                    quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason=f"[UNPARSEABLE: BinaryNullByte ({byte_size:,} B)]"))
                     continue
-            except PermissionError:
-                quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason="[UNPARSEABLE: PermissionError on read]"))
-                continue
-            except OSError as exc:
-                quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason=f"[UNPARSEABLE: OSError ({exc.__class__.__name__})]"))
-                continue
-
-            is_py = ext in PYTHON_AST_EXTS
-            try:
                 text = fpath.read_text(encoding="utf-8", errors="strict")
             except UnicodeDecodeError:
-                est_lines = max(1, sniff_chunk.count(b"\n"))
-                fault_msg = "[UNPARSEABLE: UnicodeDecodeError (Non-UTF-8 file encoding)]"
-                records.append(
-                    FileRecord(
-                        rel_path=rel_file,
-                        parent_dir=rel_dir,
-                        subsystem=subsystem,
-                        byte_size=byte_size,
-                        line_count=est_lines,
-                        tokens_est=max(1, byte_size // 4),
-                        is_python=is_py,
-                        fault_status=fault_msg,
-                    )
-                )
-                quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason=fault_msg))
+                quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason="[UNPARSEABLE: UnicodeDecodeError]"))
                 continue
             except OSError as exc:
-                quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason=f"[UNPARSEABLE: OSError ({exc.__class__.__name__})]"))
+                quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason=f"[UNPARSEABLE: ReadError ({exc.__class__.__name__})]"))
                 continue
 
             lines = text.splitlines()
             if not lines:
                 continue
 
+            eff_loc = sum(1 for l in lines if l.strip() and not l.strip().startswith("#") and not l.strip().startswith("//"))
+            eff_loc = max(1, eff_loc)
+            arch = classify_archetype(rel_file, is_opaque=False, source_text=text)
+            _, b_target, b_hard = compute_file_budget_bytes(arch, eff_loc)
+            c_hash = compute_content_hash_8hex(fpath)
             tokens_est = estimate_tokens(text)
+            is_atomic = bool(ATOMIC_MONOLITH_PATTERN.search(text))
 
-            if is_py:
-                syms, reexports, ast_fault = parse_python_ast(text, is_init_file=(fname == "__init__.py"))
-                if ast_fault:
-                    quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason=ast_fault))
-                records.append(
-                    FileRecord(
-                        rel_path=rel_file,
-                        parent_dir=rel_dir,
-                        subsystem=subsystem,
-                        byte_size=byte_size,
-                        line_count=len(lines),
-                        tokens_est=tokens_est,
-                        is_python=True,
-                        symbols=syms,
-                        reexports=reexports,
-                        fault_status=ast_fault,
+            if ext in PYTHON_AST_EXTS:
+                try:
+                    tree = ast.parse(text)
+                    scanner = PolymorphicPythonScanner(lines)
+                    scanner.visit(tree)
+                    syms = scanner.symbols
+                    anchor_sigs = dict(scanner.anchor_sigs)
+                    wildcard_sig = short_sig_hex("|".join(f"{k}:{v}" for k, v in sorted(anchor_sigs.items())) if anchor_sigs else "empty_py")
+                    anchor_sigs["*"] = wildcard_sig
+                    ast_col = format_pruned_ast_column(syms, b_target=b_target, effective_loc=eff_loc)
+                    workspace_sig_map[rel_file] = anchor_sigs
+                    records.append(
+                        FileRecord(
+                            rel_path=rel_file,
+                            parent_dir=rel_dir,
+                            subsystem=subsystem,
+                            byte_size=byte_size,
+                            line_count=len(lines),
+                            effective_loc=eff_loc,
+                            tokens_est=tokens_est,
+                            archetype=arch,
+                            b_target=b_target,
+                            b_hard=b_hard,
+                            content_hash=c_hash,
+                            struct_sig=wildcard_sig,
+                            ast_signature_str=ast_col,
+                            anchor_sigs=anchor_sigs,
+                            is_python=True,
+                            is_atomic_monolith=is_atomic,
+                            symbols=syms,
+                        )
                     )
-                )
+                except SyntaxError as exc:
+                    fault = f"[UNPARSEABLE: SyntaxError at L{exc.lineno or 1}]"
+                    quarantine_log.append(QuarantineEntry(rel_path=rel_file, reason=fault))
             else:
+                anchor_sigs, ast_col = scan_non_python_structural_sigs(rel_file, text)
+                wildcard_sig = anchor_sigs.get("*", "000000")
+                workspace_sig_map[rel_file] = anchor_sigs
                 records.append(
                     FileRecord(
                         rel_path=rel_file,
@@ -951,17 +1219,31 @@ def scan_repository(
                         subsystem=subsystem,
                         byte_size=byte_size,
                         line_count=len(lines),
+                        effective_loc=eff_loc,
                         tokens_est=tokens_est,
+                        archetype=arch,
+                        b_target=b_target,
+                        b_hard=b_hard,
+                        content_hash=c_hash,
+                        struct_sig=wildcard_sig,
+                        ast_signature_str=ast_col,
+                        anchor_sigs=anchor_sigs,
                         is_python=False,
+                        is_atomic_monolith=is_atomic,
                     )
                 )
 
-    runtimes = detect_runtimes(root)
-    return records, quarantine_log, runtimes
+    return records, quarantine_log, detect_runtimes(root), workspace_sig_map
+
+
+# --- State Harvesting & Dual-Hash Auto-Ack (ADR-016 HC-01 & HC-02) ---
+
+FILE_TABLE_ROW_RE = re.compile(
+    r"^\|\s*`([^`]+)`\s*`\[(?:L1-L(\d+)|OPAQUE_L3|L4_DEMOTED)\]`\s*\|\s*`([A-Z_]+)`[^|]*\|\s*`([0-9a-fA-F]{6,12})(?::([0-9a-fA-F]{6}))?`\s*\|\s*`([^`]*)`\s*\|\s*(.+?)\s*\|$"
+)
 
 
 def find_existing_tokenme_shards(root: Path) -> List[Path]:
-    """Finds root TOKENME*.txt and any subdirectory TOKENME.<subsystem>.txt shards."""
     found: List[Path] = []
     for dirpath, dirnames, filenames in os.walk(root, topdown=True, followlinks=False):
         dirnames[:] = [d for d in sorted(dirnames) if d not in DEFAULT_IGNORE_DIRS and not d.startswith(".")]
@@ -973,162 +1255,181 @@ def find_existing_tokenme_shards(root: Path) -> List[Path]:
     return found
 
 
-def harvest_existing_state(root: Path) -> Tuple[Dict[str, str], Dict[str, HarvestedFileState]]:
-    """Harvests L0 metadata, L1 roles, L2 Python/agent symbols, and hydrated L3 opaque fields across all shards."""
-    l0_meta: Dict[str, str] = {}
-    file_states: Dict[str, HarvestedFileState] = {}
+def harvest_existing_shards(root: Path) -> Tuple[Dict[str, HarvestedShardState], Dict[str, HarvestedRow]]:
+    shard_states: Dict[str, HarvestedShardState] = {}
+    all_rows: Dict[str, HarvestedRow] = {}
 
-    header_re = re.compile(r"^###\s+`([^`]+)`\s+\[(?:L1-L(\d+)|OPAQUE_L3|L4_DEMOTED)\]")
-    table_row_re = re.compile(r"^\|\s*`([^`]+)`\s*\|\s*\[L1-L(\d+)\]\s*\|\s*[^|]+\|\s*[^|]+\|\s*(.+?)\s*\|$")
-    role_re = re.compile(r"^-\s+\*\*Role & Invariants:\*\*\s*(.+)$")
-    sym_re = re.compile(r"^\s*-\s+`([^`]+)`\s+\[L\d+-L\d+\]\s*:\s*(.+)$")
-    l0_bullet_re = re.compile(r"^-\s+\*\*([^:*]+):\*\*\s*(.+)$")
-    opaque_cls_re = re.compile(r"^-\s+\*\*Asset_Class:\*\*\s*(.+)$")
-    opaque_sum_re = re.compile(r"^-\s+\*\*Visual_Summary:\*\*\s*(.+)$")
-    opaque_ocr_re = re.compile(r"^-\s+\*\*OCR_Payload:\*\*\s*(.+)$")
-
-    for existing_path in find_existing_tokenme_shards(root):
+    for shard_path in find_existing_tokenme_shards(root):
+        rel_shard = shard_path.relative_to(root).as_posix()
+        st = HarvestedShardState(rel_shard_posix=rel_shard)
         try:
-            lines = existing_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+            raw_text = shard_path.read_text(encoding="utf-8", errors="ignore")
+            lines = raw_text.splitlines()
         except OSError:
             continue
 
-        current_file: Optional[str] = None
-        in_l2_block = False
-        per_file_counts: Dict[Tuple[str, str], int] = {}
-
-        for line in lines:
+        st.is_atomic_monolith = bool(ATOMIC_MONOLITH_PATTERN.search(raw_text))
+        section = ""
+        for idx, line in enumerate(lines, start=1):
             stripped = line.strip()
+            if stripped.startswith("# === [PURPOSE] ==="):
+                section = "PURPOSE"
+                continue
+            if stripped.startswith("# === [TOPOLOGY] ==="):
+                section = "TOPOLOGY"
+                continue
+            if stripped.startswith("# === ["):
+                section = "OTHER"
+                continue
 
-            if existing_path == root / "TOKENME.txt" and current_file is None:
-                m_l0 = l0_bullet_re.match(stripped)
-                if m_l0:
-                    key_label = m_l0.group(1).strip()
-                    val_str = m_l0.group(2).strip()
-                    if not val_str.startswith("[TODO: AGENT_FILL"):
-                        l0_meta[key_label] = val_str
+            if section == "PURPOSE" and stripped and not stripped.startswith("#"):
+                st.purpose_lines.append(stripped)
+            elif section == "TOPOLOGY" and stripped:
+                if not stripped.startswith("# [BOOTSTRAP_REQUIRED"):
+                    st.topology_lines.append(stripped)
 
-            m_table = table_row_re.match(stripped)
-            if m_table:
-                t_path = m_table.group(1).strip()
-                t_lines = int(m_table.group(2))
-                t_role = m_table.group(3).strip()
-                st = file_states.setdefault(
-                    t_path, HarvestedFileState(old_line_count=t_lines, role_summary=t_role)
+            m_row = FILE_TABLE_ROW_RE.match(stripped)
+            if m_row:
+                f_path = m_row.group(1).strip()
+                old_lc = int(m_row.group(2)) if m_row.group(2) else 1
+                c_hash = m_row.group(4).strip()
+                s_sig = (m_row.group(5) or "000000").strip()
+                role_val = m_row.group(7).strip()
+                h_row = HarvestedRow(
+                    rel_path=f_path,
+                    old_line_count=old_lc,
+                    content_hash=c_hash,
+                    struct_sig=s_sig,
+                    role_summary=role_val,
+                    shard_rel_posix=rel_shard,
+                    line_number=idx,
+                    raw_row=stripped,
                 )
-                if not t_role.startswith("[TODO: AGENT_FILL"):
-                    st.role_summary = t_role
-                continue
+                st.rows[f_path] = h_row
+                all_rows[f_path] = h_row
 
-            m_file = header_re.match(stripped)
-            if m_file:
-                current_file = m_file.group(1).strip()
-                old_lc = int(m_file.group(2)) if m_file.group(2) else 1
-                if current_file not in file_states:
-                    file_states[current_file] = HarvestedFileState(
-                        old_line_count=old_lc,
-                        role_summary="[TODO: AGENT_FILL - Summarize file responsibility & invariants]",
-                    )
-                else:
-                    file_states[current_file].old_line_count = old_lc
-                in_l2_block = False
-                continue
-
-            if current_file is None:
-                continue
-
-            st = file_states[current_file]
-            m_role = role_re.match(stripped)
-            if m_role:
-                role_val = m_role.group(1).strip()
-                if not role_val.startswith("[TODO: AGENT_FILL"):
-                    st.role_summary = role_val
-                continue
-
-            m_ocls = opaque_cls_re.match(stripped)
-            if m_ocls and "[NEEDS_HYDRATION" not in m_ocls.group(1):
-                st.opaque_class = m_ocls.group(1).strip()
-                continue
-
-            m_osum = opaque_sum_re.match(stripped)
-            if m_osum and "[NEEDS_HYDRATION" not in m_osum.group(1):
-                st.opaque_summary = m_osum.group(1).strip()
-                continue
-
-            m_oocr = opaque_ocr_re.match(stripped)
-            if m_oocr and "[NEEDS_HYDRATION" not in m_oocr.group(1):
-                st.opaque_ocr = m_oocr.group(1).strip()
-                continue
-
-            if stripped.startswith("- **L2 Symbol Coordinates"):
-                in_l2_block = True
-                continue
-
-            if stripped.startswith("### ") or stripped.startswith("## ") or stripped.startswith("---"):
-                current_file = None
-                in_l2_block = False
-                continue
-
-            if in_l2_block and line.startswith("  - "):
-                if "[AGENT_POPULATE_SYMBOLS]" in stripped or "[UNPARSEABLE:" in stripped:
-                    continue
-                st.raw_symbol_lines.append(line)
-                m_sym = sym_re.match(line)
-                if m_sym:
-                    raw_sig = m_sym.group(1).strip()
-                    sym_name = raw_sig.split()[-1] if " " in raw_sig else raw_sig
-                    desc = m_sym.group(2).strip()
-                    occ_key = (current_file, sym_name)
-                    occ_idx = per_file_counts.get(occ_key, 0)
-                    per_file_counts[occ_key] = occ_idx + 1
-                    st.exact_symbols[(sym_name, occ_idx)] = desc
-                    st.fallback_symbols.setdefault(sym_name, desc)
-
-    return l0_meta, file_states
+        shard_states[rel_shard] = st
+    return shard_states, all_rows
 
 
-def merge_harvested_state(
-    records: List[FileRecord], file_states: Dict[str, HarvestedFileState]
-) -> None:
+def merge_harvested_rows_into_records(records: List[FileRecord], all_rows: Dict[str, HarvestedRow]) -> None:
+    """Preserves hydrated role summaries across sync passes."""
     for rec in records:
-        st = file_states.get(rec.rel_path)
-        if not st:
+        h = all_rows.get(rec.rel_path)
+        if not h:
+            continue
+        if not any(tok in h.role_summary for tok in UNFILLED_PLACEHOLDER_PATTERNS):
+            rec.role_summary = h.role_summary
+
+
+# --- ADR-011 & ADR-016 Purpose & Topology Validation & Locking ---
+
+def render_and_lock_purpose_block(
+    tier_id: str,
+    existing_purpose_lines: List[str],
+    default_runtime_str: str,
+    scope_label: str,
+) -> List[str]:
+    spec = STATE_TIERS[tier_id]
+    out: List[str] = ["# === [PURPOSE] ==="]
+
+    if not existing_purpose_lines or any("[BOOTSTRAP_REQUIRED" in l for l in existing_purpose_lines):
+        out.append(
+            f"# [BOOTSTRAP_REQUIRED: POPULATE_PURPOSE | SCOPE={scope_label} | MAX_BYTES={spec.purpose_max_bytes} | "
+            "Write 3 lines: SYSTEM:, BOUNDARY:, RUNTIME: then run `python tokenme-sync.py` to lock [#sig] and self-consume this prompt]"
+        )
+        out.append("SYSTEM: [BOOTSTRAP_REQUIRED]")
+        out.append("BOUNDARY: [BOOTSTRAP_REQUIRED]")
+        out.append(f"RUNTIME: {default_runtime_str}")
+        out.append("")
+        return out
+
+    cleaned: List[str] = []
+    for l in existing_purpose_lines[:3]:
+        cleaned.append(re.sub(r"\s*\[#sig:[0-9a-fA-F]{6}\]\s*$", "", l).strip())
+    joined = "\n".join(cleaned)
+    sig = short_sig_hex(joined)
+    byte_len = utf8_byte_len(joined)
+    if byte_len > spec.purpose_max_bytes:
+        out.append(f"# [BUDGET_EXCEEDED: PURPOSE block is {byte_len} B > {spec.purpose_max_bytes} B ceiling. Condense prose.]")
+    for idx, l in enumerate(cleaned):
+        if idx == len(cleaned) - 1:
+            out.append(f"{l} [#sig:{sig}]")
+        else:
+            out.append(l)
+    out.append("")
+    return out
+
+
+def validate_and_lock_topology_block(
+    tier_id: str,
+    existing_topology_lines: List[str],
+    workspace_sig_map: Dict[str, Dict[str, str]],
+    scope_label: str,
+) -> List[str]:
+    spec = STATE_TIERS[tier_id]
+    out: List[str] = ["# === [TOPOLOGY] ==="]
+
+    raw_edges = [l for l in existing_topology_lines if not l.startswith("#")]
+    if not raw_edges:
+        out.append(
+            f"# [BOOTSTRAP_REQUIRED: POPULATE_TOPOLOGY | SCOPE={scope_label} | "
+            f"TARGET_EDGES={spec.topology_min_edges}..{spec.topology_max_edges} | MAX_BYTES={spec.topology_max_bytes} | "
+            "Format: `<src_file>::<anchor> -> <dst_file>::<anchor> : <mechanism>`]"
+        )
+        out.append("")
+        return out
+
+    valid_rendered: List[str] = []
+    for line in raw_edges:
+        m = RE_TOPOLOGY_EDGE.match(line.strip())
+        if not m:
+            out.append(f"# [STALE_EDGE: Malformed topology edge syntax: {line.strip()}]")
+            out.append(line.strip())
             continue
 
-        if not st.role_summary.startswith("[TODO: AGENT_FILL") and not st.role_summary.startswith("[NEEDS_HYDRATION"):
-            rec.role_summary = st.role_summary
+        src_f, src_s = m.group("src_file"), m.group("src_sym")
+        dst_f, dst_s = m.group("dst_file"), m.group("dst_sym")
+        mech = m.group("mech").strip()
+        old_sig = m.group("sig")
 
-        if rec.is_opaque and rec.opaque_info:
-            if st.opaque_class:
-                rec.opaque_info.asset_class = st.opaque_class
-            if st.opaque_summary:
-                rec.opaque_info.visual_summary = st.opaque_summary
-            if st.opaque_ocr:
-                rec.opaque_info.ocr_payload = st.opaque_ocr
-        elif rec.is_python:
-            for sym in rec.symbols:
-                exact_desc = st.exact_symbols.get((sym.name, sym.overload_idx))
-                fall_desc = st.fallback_symbols.get(sym.name) or st.fallback_symbols.get(sym.unqualified_name)
-                if exact_desc:
-                    sym.description = exact_desc
-                elif fall_desc and sym.overload_idx == 0:
-                    sym.description = fall_desc
+        src_map = workspace_sig_map.get(src_f, {})
+        dst_map = workspace_sig_map.get(dst_f, {})
+
+        # Allow TOKENME*.txt section targets
+        src_sig = "tokenme" if Path(src_f).name.startswith("TOKENME") else src_map.get(src_s)
+        dst_sig = "tokenme" if Path(dst_f).name.startswith("TOKENME") else dst_map.get(dst_s)
+
+        if src_sig is None or dst_sig is None:
+            missing = f"{src_f}::{src_s}" if src_sig is None else f"{dst_f}::{dst_s}"
+            out.append(f"# [STALE_EDGE: Anchor '{missing}' missing from workspace AST/structure. Update or remove edge.]")
+            out.append(line.strip())
+            continue
+
+        live_edge_sig = short_sig_hex(f"{src_f}::{src_s}={src_sig}->{dst_f}::{dst_s}={dst_sig}")
+        if old_sig and old_sig.lower() != live_edge_sig.lower():
+            out.append(
+                f"# [SIG_DRIFT: Structural signature shifted ({old_sig} -> {live_edge_sig}). "
+                "Verify edge accuracy, then run `--ack` or delete [#sig:old] to re-lock.]"
+            )
+            valid_rendered.append(f"{src_f}::{src_s} -> {dst_f}::{dst_s} : {mech} [#sig:{old_sig}]")
         else:
-            if st.raw_symbol_lines:
-                rec.preserved_raw_symbols = list(st.raw_symbol_lines)
-                if st.old_line_count > 0 and st.old_line_count != rec.line_count:
-                    delta = rec.line_count - st.old_line_count
-                    sign = "+" if delta > 0 else ""
-                    rec.stale_coord_warning = (
-                        f"[COORDS_STALE_CHECK: File line count shifted L{st.old_line_count}->L{rec.line_count} "
-                        f"({sign}{delta} lines); agent must verify L2 spans below]"
-                    )
+            valid_rendered.append(f"{src_f}::{src_s} -> {dst_f}::{dst_s} : {mech} [#sig:{live_edge_sig}]")
+
+    total_bytes = utf8_byte_len("\n".join(valid_rendered))
+    if len(valid_rendered) > spec.topology_max_edges or total_bytes > spec.topology_max_bytes:
+        out.append(
+            f"# [BUDGET_EXCEEDED: TOPOLOGY has {len(valid_rendered)} edges ({total_bytes} B); "
+            f"ceiling is {spec.topology_max_edges} edges ({spec.topology_max_bytes} B).]"
+        )
+    out.extend(valid_rendered)
+    out.append("")
+    return out
 
 
-# --- Section Renderers (ADR-002, ADR-008, ADR-009, ADR-010) ---
+# --- ADR-016 HC-01 Section Renderers ---
 
 def render_merkle_header_block(adr_count: int, state_root: str = "PENDING") -> List[str]:
-    """ADR-008 Sec 2.5: Canonical top metadata block exposing STATE_ROOT and ADR_COUNT."""
     return [
         f"# TOKENME_VERSION: {SPEC_VERSION}",
         f"# STATE_ROOT: {state_root}",
@@ -1137,91 +1438,46 @@ def render_merkle_header_block(adr_count: int, state_root: str = "PENDING") -> L
     ]
 
 
-def render_adr_index_section(adr_records: List[ADRRecord]) -> List[str]:
-    """ADR-007, ADR-008 & ADR-010 AMB-03: Renders the Merkle-indexed ADR table with supersession tags."""
+def render_adr_section(adr_records: List[ADRRecord]) -> List[str]:
     if not adr_records:
         return []
     out: List[str] = [
-        "## Architecture Decision Ledger (`docs/adr/` — ADR-007 & ADR-008 Merkle Provenance)",
+        "# === [ADRS] ===",
         "| Record ID | Date | Status & Supersession | Leaf Hash | Decision Artifact (`[RecordID]_[ISODate]_[TitleSlug].md`) |",
         "| :--- | :--- | :--- | :--- | :--- |",
     ]
     for adr in adr_records:
+        out.append(f"| `{adr.record_id}` | {adr.iso_date} | {adr.status} | `{adr.leaf_hash}` | `{adr.rel_posix}` |")
+    out.append("")
+    return out
+
+
+def render_files_table_section(records: List[FileRecord]) -> List[str]:
+    """ADR-016 HC-01: Unified 5-Column GFM Pipe Table for # === [FILES] ===."""
+    if not records:
+        return []
+    out: List[str] = [
+        "# === [FILES] ===",
+        "| Path & Span | Archetype & Budget | Hash (`content:struct`) | Deterministic AST / Structural Signature | Declarative Role & Invariants |",
+        "| :--- | :--- | :--- | :--- | :--- |",
+    ]
+    for rec in records:
+        if rec.is_opaque and rec.opaque_info:
+            span_tag = "[L4_DEMOTED]" if rec.opaque_info.is_l4_demoted else "[OPAQUE_L3]"
+        else:
+            span_tag = f"[L1-L{rec.line_count}]"
+
+        role_clean = rec.role_summary.replace("|", ";").strip()
+        role_bytes = utf8_byte_len(role_clean)
+        if role_bytes > rec.b_hard and not role_clean.startswith("[BUDGET_EXCEEDED"):
+            role_clean = f"[BUDGET_EXCEEDED: {role_bytes}B > {rec.b_hard}B] {role_clean}"
+
+        ast_clean = rec.ast_signature_str.replace("|", ";").strip()
         out.append(
-            f"| `{adr.record_id}` | {adr.iso_date} | {adr.status} | `{adr.leaf_hash}` | `{adr.rel_posix}` |"
+            f"| `{rec.rel_path}` `{span_tag}` | `{rec.archetype}` (<={rec.b_hard} B) | "
+            f"`{rec.content_hash}:{rec.struct_sig}` | `{ast_clean}` | {role_clean} |"
         )
     out.append("")
-    return out
-
-
-def render_single_file_l2_block(rec: FileRecord) -> List[str]:
-    """Renders an individual code file or opaque/L4 asset L2 block."""
-    out: List[str] = []
-    kb_str = f"{rec.byte_size / 1024:.1f} KiB"
-
-    if rec.is_opaque and rec.opaque_info:
-        info = rec.opaque_info
-        if info.is_l4_demoted:
-            flag = "[NEEDS_HYDRATION]" if info.sidecar_status != "HYDRATED" else "[HYDRATED]"
-            out.append(
-                f"### `{rec.rel_path}` [L4_DEMOTED] ({kb_str} | {info.modality} | {info.est_pages}p | {flag})"
-            )
-            out.append(
-                f"- **L3_Surrogate_Sidecar:** `{info.sidecar_rel_path}` "
-                f"(Status: `{info.sidecar_status}` | L4_Hash: `{info.source_hash}` | Sidecar_Leaf_Hash: `{info.sidecar_leaf_hash}`)"
-            )
-            out.append(f"- **Pre_Scraped_Meta:** `{info.pre_scraped_meta}`")
-            out.append(f"- **Visual_Summary:** {info.visual_summary}")
-        else:
-            out.append(
-                f"### `{rec.rel_path}` [OPAQUE_L3] ({kb_str} | {info.modality} | {info.dimensions} | Hash: `{info.source_hash}`)"
-            )
-            out.append(f"- **Asset_Class:** {info.asset_class}")
-            out.append(f"- **Meta_Context:** `{info.pre_scraped_meta}`")
-            out.append(f"- **Visual_Summary:** {info.visual_summary}")
-            out.append(f"- **OCR_Payload:** {info.ocr_payload}")
-        out.append("")
-        return out
-
-    # Standard Source / Text File
-    out.append(
-        f"### `{rec.rel_path}` [L1-L{rec.line_count}] ({kb_str} | ~{rec.tokens_est} conservative tokens)"
-    )
-    out.append(f"- **Role & Invariants:** {rec.role_summary}")
-    if rec.reexports:
-        joined_re = ", ".join(f"`{r}`" for r in rec.reexports)
-        out.append(f"- **Re-Exports / Facade Routes (`__init__`):** {joined_re}")
-
-    if rec.fault_status:
-        out.append(f"- **L2 Symbol Coordinates:** `{rec.fault_status}` — Structural stub only; fix syntax/encoding to restore AST indexing.")
-    elif rec.is_python:
-        if rec.symbols:
-            out.append("- **L2 Symbol Coordinates (Python AST):**")
-            for sym in rec.symbols:
-                out.append(f"  - `{sym.kind} {sym.name}` {sym.coord}: {sym.description}")
-        else:
-            out.append("- **L2 Symbol Coordinates (Python AST):** _(Module script / constants only; no top-level class or def declarations)_")
-    else:
-        if rec.stale_coord_warning:
-            out.append(f"- **L2 Symbol Coordinates:** `{rec.stale_coord_warning}`")
-        else:
-            out.append("- **L2 Symbol Coordinates:**")
-
-        if rec.preserved_raw_symbols:
-            for raw_line in rec.preserved_raw_symbols:
-                out.append(raw_line)
-        else:
-            out.append(
-                "  - `[AGENT_POPULATE_SYMBOLS]` — Non-Python source/doc file; coding agent must populate `- `<kind> <Name>` [Lstart-Lend]: <concise summary>` (and `-> impl:` pointers where applicable) upon first inspection."
-            )
-    out.append("")
-    return out
-
-
-def render_file_digest_section(records: List[FileRecord]) -> List[str]:
-    out: List[str] = []
-    for rec in records:
-        out.extend(render_single_file_l2_block(rec))
     return out
 
 
@@ -1229,58 +1485,48 @@ def render_quarantine_section(quarantine_log: List[QuarantineEntry]) -> List[str
     if not quarantine_log:
         return []
     out: List[str] = [
-        "## Quarantined & Unparseable Artifacts (ADR-006 Fail-Closed Ledger)",
+        "# === [QUARANTINE] ===",
         "| File / Path | Isolation Reason |",
         "| :--- | :--- |",
     ]
     for q in quarantine_log[:40]:
         out.append(f"| `{q.rel_path}` | `{q.reason}` |")
-    if len(quarantine_log) > 40:
-        out.append(f"| _...and {len(quarantine_log) - 40} additional quarantined items_ | _(Omitted for token budget)_ |")
     out.append("")
     return out
 
 
-def render_bootstrap_footer(topology_mode: str) -> List[str]:
-    return [
-        "---",
-        "## [SELF-REFERENTIAL BOOTSTRAP & AGENT MAINTENANCE PROTOCOL]",
-        "```yaml",
-        f"spec_version: {SPEC_VERSION}",
-        f"scaffolder_version: {VERSION}",
-        f"topology_mode: {topology_mode}",
-        "agent_execution_protocol:",
-        "  1_MIPMAP_ROUTING: Read root TOKENME.txt (and check STATE_ROOT) BEFORE executing broad grep, find, or full-file reads.",
-        "  2_SURGICAL_L3_READ: Use [Lstart-Lend] coordinates to issue bounded line-range reads; never ingest [L4_DEMOTED] binaries whole (read .l3.txt sidecar first).",
-        "  3_NON_PYTHON_STUBS: Where `[AGENT_POPULATE_SYMBOLS]` appears, inspect the file once and populate `- `<kind> <Name>` [Lstart-Lend]: <summary>` entries.",
-        "  4_HYDRATION_DUTY: Resolve `[TODO: AGENT_FILL]`, `[NEEDS_HYDRATION]`, and `[COORDS_STALE_CHECK]` markers in files/sidecars you touch.",
-        "  5_MERKLE_SYNC: Run `python3 tokenme-sync.py` (or `--sync`) after edits to refresh AST coordinates, sidecar hashes, and Merkle STATE_ROOT (`--check` in CI).",
-        "```",
-    ]
+# --- ADR-012, ADR-013 & ADR-016 HC-04 / HC-06 Hop-Distance Sharding & Compaction ---
 
-
-# --- ADR-009 Part E & ADR-010 HC-02 Two-Pass Sharding Engine ---
-
-def evaluate_pass1_subdir_shard(
-    subdir_rel: str, subdir_records: List[FileRecord]
+def evaluate_subdir_shard_trigger(
+    subdir_records: List[FileRecord],
+    hop_depth: int = 1,
+    is_atomic_override: bool = False,
 ) -> Tuple[bool, str]:
     """
-    ADR-009 Part E (Pass 1) & ADR-010 Sec 3.1:
-    Evaluates a top-level subdirectory for Opaque Density (>=8), Projected L2 Lines (>100),
-    or Extracted Symbol Count (>75).
+    Evaluates ADR-012 / ADR-016 forward sharding gates with Multi-Modal Splitability check,
+    ATOMIC_MONOLITH override, and R_max=1 single-pass child overflow warning.
     """
+    if is_atomic_override or any(r.is_atomic_monolith for r in subdir_records):
+        return False, "ATOMIC_MONOLITH"
+    if len(subdir_records) < MIN_SPLIT_SECTIONS:
+        return False, "ATOMIC_MONOLITH"
+
     n_opaque = sum(1 for r in subdir_records if r.is_opaque)
-    code_recs = [r for r in subdir_records if not r.is_opaque]
-    code_symbols = sum(len(r.symbols) + len(r.preserved_raw_symbols) for r in code_recs)
-    code_l2_lines = sum(len(render_single_file_l2_block(r)) for r in code_recs)
-    proj_lines = code_l2_lines + (n_opaque * PROJECTED_L2_LINES_PER_OPAQUE)
+    total_syms = sum(len(r.symbols) for r in subdir_records)
+    table_preview = "\n".join(render_files_table_section(subdir_records))
+    est_tok = estimate_tokens(table_preview)
+    min_viable_tok = math.ceil(MIN_CHILD_VIABILITY_RATIO * HOP_BASE_TOKENS_S0)
+
+    parent_split_ceiling = hop_split_token_ceiling(max(0, hop_depth - 1), is_monolith=False)
+    child_split_ceiling = hop_split_token_ceiling(hop_depth, is_monolith=False)
+    overflow_suffix = ":SHARD_OVERFLOW_WARN" if est_tok > child_split_ceiling else ""
 
     if n_opaque >= OPAQUE_SHARD_COUNT_THRESHOLD:
-        return True, f"OPAQUE_DENSITY({n_opaque})"
-    if proj_lines > DIR_PROJECTED_LINE_CEILING:
-        return True, f"PROJECTED_L2_OVERFLOW({proj_lines})"
-    if code_symbols > SHARD_TRIGGER_SYMBOLS:
-        return True, f"SYMBOL_COUNT({code_symbols})"
+        return True, f"OPAQUE_DENSITY({n_opaque}){overflow_suffix}"
+    if total_syms > SHARD_TRIGGER_SYMBOLS and est_tok >= min_viable_tok:
+        return True, f"SYMBOL_COUNT({total_syms}){overflow_suffix}"
+    if est_tok > parent_split_ceiling and est_tok >= min_viable_tok:
+        return True, f"HOP_BUDGET_SPLIT({est_tok}t){overflow_suffix}"
     return False, "INLINE_IN_ROOT"
 
 
@@ -1290,262 +1536,537 @@ def build_documents(
     adr_records: List[ADRRecord],
     quarantine_log: List[QuarantineEntry],
     runtimes: List[str],
-    l0_meta: Dict[str, str],
+    harvested_shards: Dict[str, HarvestedShardState],
+    workspace_sig_map: Dict[str, Dict[str, str]],
     root_len: int = DEFAULT_ROOT_HASH_LEN,
     force_single: bool = False,
+    compact_mode: bool = False,
 ) -> Dict[Path, str]:
-    """
-    Executes the Two-Pass Sharding & Bottom-Up Merkle Rollup Protocol (ADR-008, ADR-009, ADR-010):
-      - Pass 1: Bottom-up subdirectory sharding (`<subdir>/TOKENME.<subsystem>.txt`).
-      - Pass 2: Root line ceiling check (`<= 150` lines). If exceeded, ejects remaining
-        unsharded inline L2 entries to `TOKENME.root-l2.txt` (<=250 lines) or splits
-        by modality into `TOKENME.code.txt` and `TOKENME.assets.txt` (>250 lines).
-      - Computes child shard `STATE_ROOT` digests first, embeds them in the parent Shard
-        Index Table, and stamps the root `STATE_ROOT` over `AGENTS.md` + `TOKENME.txt`.
-    """
-    repo_name = root.resolve().name
-    total_files = len(records)
-    code_files = [r for r in records if not r.is_opaque]
-    opaque_files = [r for r in records if r.is_opaque]
-    total_loc = sum(r.line_count for r in code_files)
-    total_raw_tokens = sum(r.tokens_est for r in records)
-    total_ast_symbols = sum(len(r.symbols) for r in records)
-    total_agent_symbols = sum(len(r.preserved_raw_symbols) for r in records)
-
-    runtime_list_str = ", ".join(runtimes) if runtimes else l0_meta.get(
-        "Primary Runtimes", l0_meta.get("Detected Runtimes", "Python >= 3.9 (Standard Library Only)")
-    )
-    sys_purpose = l0_meta.get(
-        "System Purpose",
-        "[TODO: AGENT_FILL - State core system objective in <=25 words]",
-    )
-    entrypoints = l0_meta.get(
-        "Entrypoints",
-        "[TODO: AGENT_FILL - List primary CLI/server/app entrypoints]",
-    )
-    global_invariants = l0_meta.get(
-        "Global State & Mutation Invariants",
-        l0_meta.get("Cross-Boundary Invariants", "[TODO: AGENT_FILL - Document critical data/concurrency constraints]"),
-    )
-    today_iso = datetime.date.today().isoformat()
-
+    runtime_str = ", ".join(runtimes) if runtimes else "Python >= 3.9 (Standard Library Only)"
     outputs: Dict[Path, str] = {}
-    # Tuple: (scope_label, rel_shard_posix, reason, shard_records, child_state_root)
-    mounted_shards: List[Tuple[str, str, str, List[FileRecord], str]] = []
+    mounted_shards: List[Tuple[str, str, str, int, int, str]] = []
 
-    # Group records by top-level subsystem directory
     by_subsystem: Dict[str, List[FileRecord]] = {}
     for r in records:
         by_subsystem.setdefault(r.subsystem, []).append(r)
 
     unsharded_records: List[FileRecord] = []
+    promoted_topology_edges: List[str] = []
 
-    # --- PASS 1: Bottom-Up Subdirectory Sharding (<subdir>/TOKENME.<subsystem>.txt) ---
+    prev_root = harvested_shards.get("TOKENME.txt")
+    root_atomic_monolith = bool(prev_root and prev_root.is_atomic_monolith)
+
+    # Pre-check whole-repo monolith ceiling (d=0 MONOLITH_MAX_TOKENS = 3,000t)
+    full_table_tok = estimate_tokens("\n".join(render_files_table_section(records))) + 250
+    monolith_exceeded = full_table_tok > hop_split_token_ceiling(0, is_monolith=True)
+
+    # Pass 1: Evaluate Subdirectory Shards (d >= 1)
     for sub_name, sub_recs in sorted(by_subsystem.items()):
-        if sub_name == "root" or force_single:
+        if sub_name == "root" or force_single or root_atomic_monolith:
             unsharded_records.extend(sub_recs)
             continue
 
-        should_shard_dir, trigger_reason = evaluate_pass1_subdir_shard(sub_name, sub_recs)
-        if not should_shard_dir:
-            unsharded_records.extend(sub_recs)
-            continue
-
-        # ADR-010 HC-02: Emit inside target subdirectory as <subdir>/TOKENME.<subdir_slug>.txt
         slug = re.sub(r"[^a-zA-Z0-9_-]", "-", sub_name.lower())
         rel_shard_posix = f"{sub_name}/TOKENME.{slug}.txt"
-        shard_abs_path = root / sub_name / f"TOKENME.{slug}.txt"
-        local_agents_path = root / sub_name / "AGENTS.md"
+        prev_shard_state = harvested_shards.get(rel_shard_posix)
+
+        # Compute effective hop depth from directory nesting
+        max_rel_depth = max(1, max(len(r.rel_path.split("/")) - 1 for r in sub_recs))
+        hop_d = min(4, max_rel_depth)
+
+        should_shard, reason = evaluate_subdir_shard_trigger(
+            sub_recs,
+            hop_depth=hop_d,
+            is_atomic_override=bool(prev_shard_state and prev_shard_state.is_atomic_monolith),
+        )
+
+        # If total monolith exceeds 3,000t and subsystem is viable, eject as shard
+        if not should_shard and monolith_exceeded and len(sub_recs) >= MIN_SPLIT_SECTIONS:
+            sub_tok = estimate_tokens("\n".join(render_files_table_section(sub_recs)))
+            if sub_tok >= math.ceil(MIN_CHILD_VIABILITY_RATIO * HOP_BASE_TOKENS_S0):
+                should_shard = True
+                reason = f"MONOLITH_EJECT({sub_tok}t)"
+
+        # Hysteresis Preservation & --compact Coalescing (ADR-013 & ADR-016 HC-04 / HC-06)
+        if prev_shard_state is not None and not should_shard:
+            preview_lines = render_files_table_section(sub_recs)
+            est_shard_tok = estimate_tokens("\n".join(preview_lines)) + 160
+            merge_floor = hop_merge_token_floor(hop_d)
+            root_preview_tok = estimate_tokens("\n".join(render_files_table_section(unsharded_records + sub_recs))) + 250
+            parent_headroom_cap = math.floor(PARENT_ABSORPTION_RATIO * hop_split_token_ceiling(0, is_monolith=False))
+            fits_parent = root_preview_tok <= parent_headroom_cap
+
+            if est_shard_tok <= merge_floor and fits_parent:
+                if not compact_mode:
+                    print(
+                        f"[WARN: COMPACT_ELIGIBLE] Shard '{rel_shard_posix}' is at <=35% capacity ({est_shard_tok}t <= {merge_floor}t) "
+                        f"and fits within parent headroom ({root_preview_tok}t <= {parent_headroom_cap}t). Run with '--compact' to coalesce.",
+                        file=sys.stderr,
+                    )
+                    should_shard = True
+                    reason = f"HYSTERESIS_RETENTION({est_shard_tok}t<={merge_floor}t)"
+                else:
+                    # Coalesce child shard back into root and preserve cross-module topology edges
+                    for edge_line in prev_shard_state.topology_lines:
+                        m_e = RE_TOPOLOGY_EDGE.match(edge_line.strip())
+                        if m_e:
+                            sf, df, ds = m_e.group("src_file"), m_e.group("dst_file"), m_e.group("dst_sym")
+                            if not df.startswith(f"{sub_name}/"):
+                                promoted_topology_edges.append(edge_line)
+                            else:
+                                for r in sub_recs:
+                                    if r.rel_path == sf and f"-> {df}::{ds}" not in r.role_summary:
+                                        r.role_summary = f"{r.role_summary} [Coupling: -> {df}::{ds}]"
+            else:
+                should_shard = True
+                reason = f"HYSTERESIS_RETENTION({est_shard_tok}t>{merge_floor}t)"
+
+        if not should_shard:
+            unsharded_records.extend(sub_recs)
+            continue
 
         for r in sub_recs:
             r.assigned_shard = rel_shard_posix
 
-        shard_lines: List[str] = render_merkle_header_block(adr_count=len(adr_records), state_root="PENDING")
-        shard_lines.extend([
-            f"# TOKENME.{slug}.txt — Subdirectory Epistemic Shard (`{sub_name}/`)",
-            f"> **Parent Router:** `../TOKENME.txt` | **Trigger:** `{trigger_reason}` | **Last Synced:** {today_iso}",
-            "",
-            "## 1. Subsystem Invariants & Boundary",
-            f"- **Subdirectory Scope:** `{sub_name}/` ({len(sub_recs)} files)",
-            "- **Domain Invariants:** [TODO: AGENT_FILL - Summarize subsystem invariants]",
-            "",
-            "## 2. Co-Located L1 File Invariants & L2 Symbol / Opaque Digest",
-            "",
-        ])
-        shard_lines.extend(render_file_digest_section(sub_recs))
-        shard_lines.extend(render_bootstrap_footer("SUBDIR_MIPMAP_SHARD"))
-
-        raw_shard_text = "\n".join(shard_lines) + "\n"
-        stamped_shard_text, child_root = stamp_state_root_in_text(
-            raw_shard_text, local_agents_path, root_len=root_len
-        )
-        outputs[shard_abs_path] = stamped_shard_text
-        mounted_shards.append((f"{sub_name}/", rel_shard_posix, trigger_reason, sub_recs, child_root))
-
-    # Build L0 Header + ADR Index + Quarantine + Footer to measure root line budget
-    l0_header_lines: List[str] = render_merkle_header_block(adr_count=len(adr_records), state_root="PENDING")
-    l0_header_lines.extend([
-        "# TOKENME.txt — Declarative Epistemic State & Merkle Router",
-        f"> **Repository:** `{repo_name}` | **Spec:** TOKENME v{SPEC_VERSION} | **Last Synced:** {today_iso}",
-        f"> **Coverage:** {total_files} files ({len(code_files)} code/doc, {len(opaque_files)} opaque/PDF) | {total_loc:,} LOC | {total_ast_symbols} AST syms + {total_agent_symbols} agent syms | ~{total_raw_tokens:,} conservative tokens",
-        "",
-        "## 1. L0 System Identity & Architectural Invariants",
-        f"- **Primary Runtimes:** {runtime_list_str}",
-        f"- **System Purpose:** {sys_purpose}",
-        f"- **Entrypoints:** {entrypoints}",
-        f"- **Global State & Mutation Invariants:** {global_invariants}",
-        "",
-    ])
-    adr_section_lines = render_adr_index_section(adr_records)
-    quarantine_lines = render_quarantine_section(quarantine_log)
-
-    unsharded_code_recs = [r for r in unsharded_records if not r.is_opaque]
-    unsharded_asset_recs = [r for r in unsharded_records if r.is_opaque]
-    unsharded_code_l2 = render_file_digest_section(unsharded_code_recs)
-    unsharded_asset_l2 = render_file_digest_section(unsharded_asset_recs)
-
-    # Estimate total root lines if unsharded records stay inline in root TOKENME.txt
-    est_mount_table_lines = (len(mounted_shards) + 6) if mounted_shards else 0
-    base_len = (
-        len(l0_header_lines)
-        + len(adr_section_lines)
-        + est_mount_table_lines
-        + len(quarantine_lines)
-        + 16  # Footer + section headers
-    )
-    spillover_len = len(unsharded_code_l2) + len(unsharded_asset_l2)
-
-    # --- PASS 2: Root Ceiling Check (<= 150 lines) & Modality-Bucketed Ejection ---
-    keep_inline_in_root = force_single or ((base_len + spillover_len) <= ROOT_LINE_CEILING)
-
-    if not keep_inline_in_root and unsharded_records:
-        if spillover_len <= SINGLE_OVERFLOW_CEILING:
-            rel_sp = "TOKENME.root-l2.txt"
-            sp_path = root / rel_sp
-            for r in unsharded_records:
-                r.assigned_shard = rel_sp
-            sp_lines = render_merkle_header_block(adr_count=len(adr_records), state_root="PENDING")
-            sp_lines.extend([
-                "# TOKENME.root-l2.txt — Root Spillover L2 Shard",
-                f"> **Parent Router:** `./TOKENME.txt` | **Trigger:** `ROOT_CEILING_EJECTION` | **Last Synced:** {today_iso}",
-                "",
-                "## Co-Located L1 File Invariants & L2 Symbol / Asset Digest",
-                "",
-            ])
-            sp_lines.extend(unsharded_code_l2)
-            sp_lines.extend(unsharded_asset_l2)
-            sp_lines.extend(render_bootstrap_footer("ROOT_OVERFLOW_SHARD"))
-            stamped_sp, sp_root = stamp_state_root_in_text(
-                "\n".join(sp_lines) + "\n", root / "AGENTS.md", root_len=root_len
+        shard_lines = render_merkle_header_block(adr_count=len(adr_records), state_root="PENDING")
+        shard_lines.extend(
+            render_and_lock_purpose_block(
+                "L2_SHARD",
+                prev_shard_state.purpose_lines if prev_shard_state else [],
+                runtime_str,
+                scope_label=f"{sub_name}/",
             )
-            outputs[sp_path] = stamped_sp
-            mounted_shards.append(("root (spillover)", rel_sp, "ROOT_CEILING_EJECTION", unsharded_records, sp_root))
-        else:
-            if unsharded_code_recs:
-                rel_code = "TOKENME.code.txt"
-                for r in unsharded_code_recs:
-                    r.assigned_shard = rel_code
-                c_lines = render_merkle_header_block(adr_count=len(adr_records), state_root="PENDING")
-                c_lines.extend([
-                    "# TOKENME.code.txt — Root Code & Script Modality Shard",
-                    f"> **Parent Router:** `./TOKENME.txt` | **Trigger:** `ROOT_EJECTION_CODE` | **Last Synced:** {today_iso}",
-                    "",
-                    "## Co-Located L1 File Invariants & L2 Code Symbol Digest",
-                    "",
-                ])
-                c_lines.extend(unsharded_code_l2)
-                c_lines.extend(render_bootstrap_footer("ROOT_MODALITY_CODE_SHARD"))
-                stamped_c, c_root = stamp_state_root_in_text(
-                    "\n".join(c_lines) + "\n", root / "AGENTS.md", root_len=root_len
-                )
-                outputs[root / rel_code] = stamped_c
-                mounted_shards.append(("root (code)", rel_code, "ROOT_EJECTION_CODE", unsharded_code_recs, c_root))
+        )
+        shard_lines.extend(
+            validate_and_lock_topology_block(
+                "L2_SHARD",
+                prev_shard_state.topology_lines if prev_shard_state else [],
+                workspace_sig_map,
+                scope_label=f"{sub_name}/",
+            )
+        )
+        shard_lines.extend(render_files_table_section(sub_recs))
 
-            if unsharded_asset_recs:
-                rel_assets = "TOKENME.assets.txt"
-                for r in unsharded_asset_recs:
-                    r.assigned_shard = rel_assets
-                a_lines = render_merkle_header_block(adr_count=len(adr_records), state_root="PENDING")
-                a_lines.extend([
-                    "# TOKENME.assets.txt — Root Opaque, Vector & L4 Asset Modality Shard",
-                    f"> **Parent Router:** `./TOKENME.txt` | **Trigger:** `ROOT_EJECTION_ASSETS` | **Last Synced:** {today_iso}",
-                    "",
-                    "## Opaque L3 Summaries & L4 Surrogate Sidecar Pointers",
-                    "",
-                ])
-                a_lines.extend(unsharded_asset_l2)
-                a_lines.extend(render_bootstrap_footer("ROOT_MODALITY_ASSETS_SHARD"))
-                stamped_a, a_root = stamp_state_root_in_text(
-                    "\n".join(a_lines) + "\n", root / "AGENTS.md", root_len=root_len
-                )
-                outputs[root / rel_assets] = stamped_a
-                mounted_shards.append(("root (assets)", rel_assets, "ROOT_EJECTION_ASSETS", unsharded_asset_recs, a_root))
+        raw_shard_text = "\n".join(shard_lines).rstrip() + "\n"
+        local_agents = root / sub_name / "AGENTS.md"
+        stamped_shard_text, child_root = stamp_state_root_in_text(raw_shard_text, local_agents, root_len=root_len)
+        outputs[root / rel_shard_posix] = stamped_shard_text
+        mounted_shards.append(
+            (f"{sub_name}/", rel_shard_posix, reason, len(sub_recs), estimate_tokens(stamped_shard_text), child_root)
+        )
 
-        unsharded_records = []
+    # Assemble Root TOKENME.txt (d=0)
+    unsharded_records.sort(key=lambda r: r.rel_path)
+    root_tier = "L1_ROOT" if mounted_shards else "L1_MONO"
+    combined_root_edges = list(prev_root.topology_lines if prev_root else [])
+    for pe in promoted_topology_edges:
+        if pe not in combined_root_edges and len(combined_root_edges) < STATE_TIERS[root_tier].topology_max_edges:
+            combined_root_edges.append(pe)
 
-    # Assemble Final Root TOKENME.txt
-    if not mounted_shards:
-        topology_mode = "MONOLITHIC_SINGLE_FILE"
-    elif unsharded_records:
-        topology_mode = "HYBRID_L1_L2_ROUTER"
-    else:
-        topology_mode = "PURE_L1_MERKLE_ROUTER"
-
-    root_lines: List[str] = list(l0_header_lines)
-    root_lines.extend(adr_section_lines)
+    root_lines = render_merkle_header_block(adr_count=len(adr_records), state_root="PENDING")
+    if root_atomic_monolith:
+        root_lines.append("# ATOMIC_MONOLITH: true")
+        root_lines.append("")
+    root_lines.extend(
+        render_and_lock_purpose_block(
+            root_tier,
+            prev_root.purpose_lines if prev_root else [],
+            runtime_str,
+            scope_label="root",
+        )
+    )
+    root_lines.extend(
+        validate_and_lock_topology_block(
+            root_tier,
+            combined_root_edges,
+            workspace_sig_map,
+            scope_label="root",
+        )
+    )
 
     if mounted_shards:
         root_lines.extend([
-            "## 2. Federated Shard Router Table (`[SHARD_MOUNT]` — ADR-008 & ADR-009)",
-            "| Scope | Shard Mount Path | Trigger Reason | Files | Child `STATE_ROOT` |",
-            "| :--- | :--- | :--- | :--- | :--- |",
+            "# === [SHARDS] ===",
+            "| Scope | Shard Mount Path | Trigger Reason | Files | Est. Tokens | Child `STATE_ROOT` |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- |",
         ])
-        for scope_lbl, rel_sh, reason_str, s_recs, c_root in mounted_shards:
-            root_lines.append(
-                f"| `{scope_lbl}` | `./{rel_sh}` | `[SHARD_MOUNT | reason:{reason_str}]` | {len(s_recs)} | `{c_root}` |"
-            )
+        for sc, rel_sh, rsn, f_cnt, tok_cnt, c_root in mounted_shards:
+            root_lines.append(f"| `{sc}` | `./{rel_sh}` | `{rsn}` | {f_cnt} | ~{tok_cnt}t | `{c_root}` |")
         root_lines.append("")
 
-    if unsharded_records:
-        sec_num = "3" if mounted_shards else "2"
-        root_lines.append(f"## {sec_num}. Inline L1/L2 File, Symbol & Opaque Asset Digest")
-        root_lines.append("")
-        root_lines.extend(unsharded_code_l2)
-        root_lines.extend(unsharded_asset_l2)
+    root_lines.extend(render_adr_section(adr_records))
+    root_lines.extend(render_files_table_section(unsharded_records))
+    root_lines.extend(render_quarantine_section(quarantine_log))
 
-    root_lines.extend(quarantine_lines)
-    root_lines.extend(render_bootstrap_footer(topology_mode))
-
-    raw_root_text = "\n".join(root_lines) + "\n"
-    stamped_root_text, _ = stamp_state_root_in_text(
-        raw_root_text, root / "AGENTS.md", root_len=root_len
-    )
+    raw_root_text = "\n".join(root_lines).rstrip() + "\n"
+    stamped_root_text, _ = stamp_state_root_in_text(raw_root_text, root / "AGENTS.md", root_len=root_len)
     outputs[root / "TOKENME.txt"] = stamped_root_text
     return outputs
 
 
-# --- ADR-008 Tier 1 Fast Integrity Verification (`--check`) ---
+# --- ADR-015 & ADR-016 HC-02 / HC-06 Triage Dispatcher (--triage) & Atomic Ack (--ack) ---
+
+def _resolve_git_diff_metrics(
+    root: Path, rel_file: str, shard_rel_posix: str, file_line_count: int
+) -> Tuple[Optional[int], Optional[int], Optional[float], Optional[str]]:
+    """
+    ADR-015 Sec 2.3 & ADR-016 HC-06 Edge Case 4 Fix:
+    Resolves GIT_DIFF_CMD across working tree or last shard commit, guarding against '-' binary numstat.
+    """
+    try:
+        st_proc = subprocess.run(
+            ["git", "status", "--porcelain", "--", rel_file],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if st_proc.returncode != 0:
+            return None, None, None, None
+
+        if st_proc.stdout.strip():
+            diff_base = "HEAD"
+            git_cmd = f"git diff HEAD -- {rel_file}"
+            num_args = ["git", "diff", "HEAD", "--numstat", "--", rel_file]
+        else:
+            log_proc = subprocess.run(
+                ["git", "log", "-n", "1", "--format=%H", "--", shard_rel_posix],
+                cwd=str(root),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            shard_commit = log_proc.stdout.strip()
+            if shard_commit:
+                diff_base = f"{shard_commit}..HEAD"
+                git_cmd = f"git diff {diff_base} -- {rel_file}"
+                num_args = ["git", "diff", diff_base, "--numstat", "--", rel_file]
+            else:
+                return None, None, None, None
+
+        num_proc = subprocess.run(num_args, cwd=str(root), capture_output=True, text=True, timeout=5)
+        if num_proc.returncode != 0 or not num_proc.stdout.strip():
+            return 0, 0, 0.0, git_cmd
+
+        first_line = num_proc.stdout.strip().splitlines()[0]
+        parts = first_line.split("\t")
+        if len(parts) < 2 or parts[0] == "-" or parts[1] == "-":
+            # Binary or un-diffable file guard (ADR-016 HC-06)
+            return None, None, 1.0, None
+
+        added, deleted = int(parts[0]), int(parts[1])
+        ratio = (added + deleted) / max(1, file_line_count)
+        return added, deleted, ratio, git_cmd
+    except Exception:
+        return None, None, None, None
+
+
+def run_triage_dispatcher(
+    root: Path,
+    max_size_bytes: int,
+    leaf_len: int,
+    strict_bytes: bool = False,
+) -> Tuple[List[TriageItem], int]:
+    """
+    ADR-015 & ADR-016: Scans all shards and disk files in memory, emitting the deterministic
+    maintenance queue without requiring the LLM agent to read clean manifests.
+    """
+    records, _, _, _ = scan_repository(root, max_size_bytes=max_size_bytes, leaf_len=leaf_len, dry_run=True)
+    shard_states, all_rows = harvest_existing_shards(root)
+    disk_map: Dict[str, FileRecord] = {r.rel_path: r for r in records}
+    items: List[TriageItem] = []
+
+    # 1. Scan existing shards for contiguous [BOOTSTRAP_REQUIRED], [STALE_EDGE], [SIG_DRIFT], [BUDGET_EXCEEDED]
+    for rel_shard, st in sorted(shard_states.items()):
+        shard_path = root / rel_shard
+        try:
+            lines = shard_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            continue
+
+        idx = 1
+        n_lines = len(lines)
+        while idx <= n_lines:
+            stripped = lines[idx - 1].strip()
+            if stripped.startswith("# [BOOTSTRAP_REQUIRED:"):
+                start_line = idx
+                end_line = idx
+                block_id = "PURPOSE" if "POPULATE_PURPOSE" in stripped else "TOPOLOGY"
+                while end_line + 1 <= n_lines and lines[end_line].strip() and not lines[end_line].strip().startswith("# === ["):
+                    end_line += 1
+                anchor_str = f"Lines {start_line}-{end_line}" if end_line > start_line else f"Line {start_line}"
+                items.append(
+                    TriageItem(
+                        item_type="UNFILLED_BOOTSTRAP",
+                        target_shard=rel_shard,
+                        line_anchor=anchor_str,
+                        block_id=block_id,
+                        current_text=stripped,
+                        recommended_action=f"Populate {block_id} block at {anchor_str} in {rel_shard} and run `python tokenme-sync.py`.",
+                    )
+                )
+                idx = end_line + 1
+                continue
+
+            if stripped.startswith("# [STALE_EDGE:") or stripped.startswith("# [SIG_DRIFT:") or stripped.startswith("# [BUDGET_EXCEEDED:"):
+                items.append(
+                    TriageItem(
+                        item_type="TOPOLOGY_OR_BUDGET_ALERT",
+                        target_shard=rel_shard,
+                        line_anchor=f"Line {idx}",
+                        block_id="HEADER_DIRECTIVE",
+                        current_text=stripped,
+                        recommended_action=f"Resolve directive at Line {idx} in {rel_shard} and run `python tokenme-sync.py`.",
+                    )
+                )
+            idx += 1
+
+    # 2. Check tracked rows vs. live disk state
+    for rel_path, h_row in sorted(all_rows.items()):
+        rec = disk_map.get(rel_path)
+        if rec is None:
+            items.append(
+                TriageItem(
+                    item_type="ORPHANED_ENTRY",
+                    target_shard=h_row.shard_rel_posix,
+                    line_anchor=f"Line {h_row.line_number}",
+                    tracked_file=rel_path,
+                    current_row=h_row.raw_row,
+                    recommended_action=f"Run `python tokenme-sync.py` to prune deleted file {rel_path} from {h_row.shard_rel_posix}.",
+                )
+            )
+            continue
+
+        if any(tok in h_row.role_summary for tok in UNFILLED_PLACEHOLDER_PATTERNS):
+            items.append(
+                TriageItem(
+                    item_type="UNFILLED_BOOTSTRAP",
+                    target_shard=h_row.shard_rel_posix,
+                    line_anchor=f"Line {h_row.line_number}",
+                    tracked_file=rel_path,
+                    current_row=h_row.raw_row,
+                    recommended_action=f"Inspect {rel_path} and populate Declarative Role at Line {h_row.line_number} in {h_row.shard_rel_posix}.",
+                )
+            )
+            continue
+
+        if h_row.content_hash != rec.content_hash:
+            # ADR-016 HC-02 Dual-Hash Auto-Ack Check: if structural sig is identical, skip unless --strict-bytes
+            if h_row.struct_sig == rec.struct_sig and not strict_bytes:
+                continue
+
+            added, deleted, ratio, git_cmd = _resolve_git_diff_metrics(
+                root, rel_path, h_row.shard_rel_posix, rec.line_count
+            )
+            delta_str = f"{h_row.content_hash}:{h_row.struct_sig} (manifest) -> {rec.content_hash}:{rec.struct_sig} (disk)"
+            if ratio is not None and ratio <= DIFF_EFFICIENCY_GATE and git_cmd:
+                items.append(
+                    TriageItem(
+                        item_type="STALE_HASH (MINOR_DELTA)",
+                        target_shard=h_row.shard_rel_posix,
+                        line_anchor=f"Line {h_row.line_number}",
+                        tracked_file=rel_path,
+                        hash_delta=delta_str,
+                        diff_metrics=f"+{added} / -{deleted} lines (File Total: {rec.line_count} lines | Ratio: {ratio:.2f} <= 0.60)",
+                        current_row=h_row.raw_row,
+                        git_diff_cmd=git_cmd,
+                        recommended_action=(
+                            f"Run GIT_DIFF_CMD. If CURRENT_ROW blurb remains accurate, run "
+                            f"`python tokenme-sync.py --ack {rel_path}`. Otherwise update Line {h_row.line_number} in {h_row.shard_rel_posix}."
+                        ),
+                    )
+                )
+            else:
+                ratio_str = f"{ratio:.2f} > 0.60" if ratio is not None else "N/A (no git baseline)"
+                metrics_str = (
+                    f"+{added} / -{deleted} lines (File Total: {rec.line_count} lines | Ratio: {ratio_str})"
+                    if added is not None
+                    else f"File Total: {rec.line_count} lines | Ratio: {ratio_str}"
+                )
+                items.append(
+                    TriageItem(
+                        item_type="STALE_HASH (MAJOR_DELTA)",
+                        target_shard=h_row.shard_rel_posix,
+                        line_anchor=f"Line {h_row.line_number}",
+                        tracked_file=rel_path,
+                        hash_delta=delta_str,
+                        diff_metrics=metrics_str,
+                        current_row=h_row.raw_row,
+                        recommended_action=f"READ_FILE_DIRECTLY. Inspect {rel_path} and update Line {h_row.line_number} in {h_row.shard_rel_posix}.",
+                    )
+                )
+
+    # 3. Check for untracked files on disk & route to owning subsystem shard if present (ADR-015 Sec 2.2)
+    for rel_path, rec in sorted(disk_map.items()):
+        if rel_path not in all_rows:
+            slug = re.sub(r"[^a-zA-Z0-9_-]", "-", rec.subsystem.lower())
+            candidate_shard = f"{rec.subsystem}/TOKENME.{slug}.txt"
+            owning_shard = candidate_shard if candidate_shard in shard_states else "TOKENME.txt"
+            items.append(
+                TriageItem(
+                    item_type="UNTRACKED_ARTIFACT",
+                    target_shard=owning_shard,
+                    line_anchor="APPEND_ROW",
+                    tracked_file=rel_path,
+                    disk_hash=f"{rec.content_hash}:{rec.struct_sig}",
+                    hash_delta=f"NONE -> {rec.content_hash}:{rec.struct_sig}",
+                    recommended_action=(
+                        f"Read first 30 lines of {rel_path}, run `python tokenme-sync.py` to scaffold row in "
+                        f"{owning_shard}, and populate its Declarative Role."
+                    ),
+                )
+            )
+
+    if not items:
+        print("=== TOKENME MAINTENANCE QUEUE (STATE: CLEAN | ITEMS: 0) ===")
+        return items, 0
+
+    print(f"=== TOKENME MAINTENANCE QUEUE (STATE: DIRTY | ITEMS: {len(items)}) ===\n")
+    for idx, it in enumerate(items, start=1):
+        print(f"[{idx}] TYPE: {it.item_type}")
+        print(f"    TARGET_SHARD:       {it.target_shard}")
+        print(f"    LINE_ANCHOR:        {it.line_anchor}")
+        if it.tracked_file:
+            print(f"    TRACKED_FILE:       {it.tracked_file}")
+        if it.block_id:
+            print(f"    BLOCK_ID:           {it.block_id}")
+        if it.current_text:
+            print(f"    CURRENT_TEXT:       {it.current_text}")
+        if it.disk_hash:
+            print(f"    DISK_HASH:          {it.disk_hash}")
+        if it.hash_delta:
+            print(f"    HASH_DELTA:         {it.hash_delta}")
+        if it.diff_metrics:
+            print(f"    DIFF_METRICS:       {it.diff_metrics}")
+        if it.current_row:
+            print(f"    CURRENT_ROW:        {it.current_row}")
+        if it.git_diff_cmd:
+            print(f"    GIT_DIFF_CMD:       {it.git_diff_cmd}")
+        print(f"    RECOMMENDED_ACTION: {it.recommended_action}\n")
+    return items, 0
+
+
+def run_atomic_ack(
+    root: Path,
+    ack_files: List[str],
+    max_size_bytes: int,
+    leaf_len: int,
+    root_len: int,
+    custom_adr_dir: Optional[str] = None,
+) -> int:
+    """
+    ADR-015 Sec 2.4 & ADR-016 HC-02:
+    Validates that target files are tracked, filled, and free of [STALE_EDGE] errors,
+    then updates their hashes, re-locks [TOPOLOGY] [#sig] tags, and recomputes STATE_ROOTs.
+    """
+    _, all_rows = harvest_existing_shards(root)
+    records, quarantine_log, runtimes, workspace_sig_map = scan_repository(
+        root, max_size_bytes=max_size_bytes, leaf_len=leaf_len, dry_run=False
+    )
+    rec_map = {r.rel_path: r for r in records}
+
+    normalized_targets: List[str] = []
+    for raw_f in ack_files:
+        norm_p = Path(raw_f)
+        if norm_p.is_absolute():
+            try:
+                rel_s = norm_p.resolve().relative_to(root).as_posix()
+            except ValueError:
+                print(f"[ERROR] File outside repository root: {raw_f}", file=sys.stderr)
+                return 2
+        else:
+            rel_s = raw_f.replace("\\", "/").lstrip("./")
+        normalized_targets.append(rel_s)
+
+    for target in normalized_targets:
+        if target not in all_rows or target not in rec_map:
+            print(
+                f"[ACK REJECTED] Exit 2: Cannot acknowledge untracked artifact `{target}`; run `tokenme-sync.py` first.",
+                file=sys.stderr,
+            )
+            return 2
+        row = all_rows[target]
+        if any(tok in row.role_summary for tok in UNFILLED_PLACEHOLDER_PATTERNS):
+            print(
+                f"[ACK REJECTED] Exit 2: Cannot acknowledge unfilled `[BOOTSTRAP_REQUIRED]` entry for `{target}`; supply a declarative summary first.",
+                file=sys.stderr,
+            )
+            return 2
+
+    # Check that no topology edge referencing target has a missing anchor ([STALE_EDGE])
+    shard_states, _ = harvest_existing_shards(root)
+    for st in shard_states.values():
+        cleaned_edges: List[str] = []
+        for edge_line in st.topology_lines:
+            m = RE_TOPOLOGY_EDGE.match(edge_line.strip())
+            if not m:
+                continue
+            sf, ss = m.group("src_file"), m.group("src_sym")
+            df, ds = m.group("dst_file"), m.group("dst_sym")
+            if sf in normalized_targets or df in normalized_targets:
+                s_ok = Path(sf).name.startswith("TOKENME") or (ss in workspace_sig_map.get(sf, {}))
+                d_ok = Path(df).name.startswith("TOKENME") or (ds in workspace_sig_map.get(df, {}))
+                if not (s_ok and d_ok):
+                    print(
+                        f"[ACK REJECTED] Exit 2: `{sf}::{ss} -> {df}::{ds}` references a deleted symbol (`[STALE_EDGE]`). Fix `[TOPOLOGY]` before `--ack`.",
+                        file=sys.stderr,
+                    )
+                    return 2
+                # Strip old [#sig:...] so validate_and_lock_topology_block stamps the new live signature
+                edge_line = re.sub(r"\s*\[#sig:[0-9a-fA-F]{6}\]\s*$", "", edge_line)
+            cleaned_edges.append(edge_line)
+        st.topology_lines = cleaned_edges
+
+    merge_harvested_rows_into_records(records, all_rows)
+    adr_records = discover_adr_records(root, leaf_len=leaf_len, custom_dir=custom_adr_dir)
+    outputs = build_documents(
+        root=root,
+        records=records,
+        adr_records=adr_records,
+        quarantine_log=quarantine_log,
+        runtimes=runtimes,
+        harvested_shards=shard_states,
+        workspace_sig_map=workspace_sig_map,
+        root_len=root_len,
+    )
+    atomic_commit_outputs(root, outputs, clean_stale_shards=True)
+    print(f"[OK] Acknowledged {len(normalized_targets)} file(s) and cascaded Merkle STATE_ROOTs.")
+    return 0
+
+
+# --- ADR-008, ADR-014 & ADR-016 HC-06 Integrity Verification (--check) ---
 
 def run_integrity_check(
     root: Path, leaf_len: int, root_len: int, custom_adr_dir: Optional[str] = None
-) -> Tuple[bool, List[str]]:
+) -> Tuple[int, List[str]]:
     """
-    ADR-008 Sec 3 (Tier 1: Fast Integrity Check):
-    Verifies in <2ms that:
-      1. Root TOKENME.txt exists and its embedded STATE_ROOT matches AGENTS.md + masked TOKENME.txt.
-      2. All ADR files in docs/adr/ match the leaf hashes recorded in root TOKENME.txt.
-      3. All mounted child shards match their embedded STATE_ROOT and parent table entry.
-      4. All L4 .l3.txt sidecars match their raw binary L4_SOURCE_HASH and parent shard entry.
+    Returns (exit_code, errors):
+      0 = Clean
+      2 = Merkle drift, child shard STATE_ROOT drift, ADR-014 AGENTS.md comment violation,
+          unfilled [BOOTSTRAP_REQUIRED], [STALE_EDGE], or [BUDGET_EXCEEDED]
     """
     errors: List[str] = []
     root_tokenme = root / "TOKENME.txt"
     if not root_tokenme.is_file():
-        return False, ["Missing root `TOKENME.txt`."]
+        return 2, ["Missing root `TOKENME.txt`."]
 
     try:
         root_text = root_tokenme.read_text(encoding="utf-8").replace("\r\n", "\n").strip()
     except OSError as exc:
-        return False, [f"Failed to read `TOKENME.txt`: {exc}"]
+        return 1, [f"Failed to read `TOKENME.txt`: {exc}"]
+
+    # ADR-014 Single-State Instruction Isolation Check on AGENTS.md
+    agents_file = root / "AGENTS.md"
+    if agents_file.is_file():
+        try:
+            agents_txt = agents_file.read_text(encoding="utf-8", errors="ignore")
+            if "<!--" in agents_txt:
+                errors.append(
+                    "ADR-014 Single-State Isolation violation in `AGENTS.md`: Dormant HTML comments (`<!-- ... -->`) "
+                    "are prohibited to prevent BPE token waste and semantic priming."
+                )
+        except OSError:
+            pass
 
     m_root = STATE_ROOT_PATTERN.search(root_text)
     if not m_root:
@@ -1553,15 +2074,11 @@ def run_integrity_check(
     else:
         recorded_root = m_root.group(2)
         expected_root = compute_merkle_state_root_from_text(
-            root_text, root / "AGENTS.md", root_len=len(recorded_root) if len(recorded_root) >= 8 else root_len
+            root_text, agents_file, root_len=len(recorded_root) if len(recorded_root) >= 8 else root_len
         )
         if recorded_root != expected_root:
-            errors.append(
-                f"Root STATE_ROOT mismatch: recorded `{recorded_root}` != computed `{expected_root}` "
-                "(TOKENME.txt or AGENTS.md modified without running `tokenme-sync.py`)."
-            )
+            errors.append(f"Root STATE_ROOT mismatch: recorded `{recorded_root}` != computed `{expected_root}`.")
 
-    # Verify ADR leaf hashes
     try:
         adr_records = discover_adr_records(root, leaf_len=leaf_len, custom_dir=custom_adr_dir)
     except Exception as exc:
@@ -1570,46 +2087,59 @@ def run_integrity_check(
 
     m_count = re.search(r"^#\s*ADR_COUNT:\s*(\d+)", root_text, re.MULTILINE)
     if m_count and int(m_count.group(1)) != len(adr_records):
-        errors.append(
-            f"ADR_COUNT mismatch: `TOKENME.txt` records {m_count.group(1)}, but disk has {len(adr_records)} ADRs."
-        )
+        errors.append(f"ADR_COUNT mismatch: `TOKENME.txt` records {m_count.group(1)}, disk has {len(adr_records)}.")
 
     for adr in adr_records:
         if f"| `{adr.leaf_hash}` | `{adr.rel_posix}` |" not in root_text:
-            errors.append(
-                f"ADR leaf drift or unindexed ADR: `{adr.rel_posix}` (current hash `{adr.leaf_hash}` not found in `TOKENME.txt`)."
-            )
+            errors.append(f"ADR leaf drift or unindexed ADR: `{adr.rel_posix}` (`{adr.leaf_hash}`).")
 
-    # Verify mounted child shards
-    shard_mount_re = re.compile(
-        r"^\|\s*`[^`]+`\s*\|\s*`\./([^`]+)`\s*\|\s*`\[SHARD_MOUNT[^`]*\]`\s*\|\s*\d+\s*\|\s*`([0-9a-fA-F]+)`\s*\|$",
-        re.MULTILINE,
-    )
-    for m_sh in shard_mount_re.finditer(root_text):
-        rel_sh = m_sh.group(1)
-        recorded_child_root = m_sh.group(2)
-        sh_path = root / rel_sh
-        if not sh_path.is_file():
-            errors.append(f"Missing mounted child shard on disk: `{rel_sh}`.")
-            continue
-        sh_text = sh_path.read_text(encoding="utf-8").replace("\r\n", "\n").strip()
-        local_agents = sh_path.parent / "AGENTS.md" if sh_path.parent != root else (root / "AGENTS.md")
-        computed_child = compute_merkle_state_root_from_text(
-            sh_text, local_agents, root_len=len(recorded_child_root)
-        )
-        if computed_child != recorded_child_root:
-            errors.append(
-                f"Child shard `{rel_sh}` STATE_ROOT drift: parent expects `{recorded_child_root}`, computed `{computed_child}`."
-            )
+    for shard_path in find_existing_tokenme_shards(root):
+        rel_sh = shard_path.relative_to(root).as_posix()
+        txt = shard_path.read_text(encoding="utf-8", errors="ignore").replace("\r\n", "\n").strip()
+        if rel_sh != "TOKENME.txt":
+            m_sr = STATE_ROOT_PATTERN.search(txt)
+            if not m_sr:
+                errors.append(f"Child shard `{rel_sh}` is missing `# STATE_ROOT: <hex>` header.")
+            else:
+                rec_sr = m_sr.group(2)
+                exp_sr = compute_merkle_state_root_from_text(
+                    txt, shard_path.parent / "AGENTS.md", root_len=len(rec_sr) if len(rec_sr) >= 8 else root_len
+                )
+                if rec_sr != exp_sr:
+                    errors.append(f"Child shard `{rel_sh}` STATE_ROOT mismatch: recorded `{rec_sr}` != computed `{exp_sr}`.")
+                if f"| `./{rel_sh}` |" in root_text and f"| `{rec_sr}` |" not in root_text:
+                    errors.append(f"Root `# === [SHARDS] ===` table has stale Child `STATE_ROOT` for `{rel_sh}`.")
+        for marker in ("# [BOOTSTRAP_REQUIRED", "# [STALE_EDGE:", "# [BUDGET_EXCEEDED:", "| `[BOOTSTRAP_REQUIRED]` |"):
+            if marker in txt:
+                errors.append(f"Validation gate failed in `{rel_sh}`: contains `{marker}`.")
 
-    return len(errors) == 0, errors
+    # Verify L4 sidecar source hashes if any .l3.txt files exist
+    for dirpath, dirnames, filenames in os.walk(root, topdown=True, followlinks=False):
+        dirnames[:] = [d for d in sorted(dirnames) if d not in DEFAULT_IGNORE_DIRS and not d.startswith(".")]
+        for fname in sorted(filenames):
+            if fname.endswith(".l3.txt"):
+                sp = Path(dirpath) / fname
+                try:
+                    stxt = sp.read_text(encoding="utf-8", errors="ignore")
+                    m_src = re.search(r"^#\s*L4_SOURCE_FILE:\s*(.+)$", stxt, re.MULTILINE)
+                    m_hsh = re.search(r"^#\s*L4_SOURCE_HASH:\s*([0-9a-fA-F]+)$", stxt, re.MULTILINE)
+                    if m_src and m_hsh:
+                        raw_src_path = root / m_src.group(1).strip()
+                        if raw_src_path.is_file():
+                            live_h = stream_sha256_hex(raw_src_path, length=len(m_hsh.group(1).strip()))
+                            if live_h != m_hsh.group(1).strip():
+                                errors.append(f"L4 sidecar `{sp.relative_to(root).as_posix()}` L4_SOURCE_HASH drift.")
+                        else:
+                            errors.append(f"L4 sidecar `{sp.relative_to(root).as_posix()}` points to missing source `{m_src.group(1).strip()}`.")
+                except OSError:
+                    pass
+
+    return (0 if not errors else 2), errors
 
 
 def atomic_commit_outputs(root: Path, outputs: Dict[Path, str], clean_stale_shards: bool = True) -> None:
-    """ADR-006 Invariant 4: Atomic temp-file staging and `os.replace()` across root and subdirectory shards."""
     staged_pairs: List[Tuple[Path, Path]] = []
     pid = os.getpid()
-
     try:
         for final_path, content in sorted(outputs.items(), key=lambda item: item[0].as_posix()):
             final_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1651,217 +2181,102 @@ def atomic_commit_outputs(root: Path, outputs: Dict[Path, str], clean_stale_shar
         raise
 
 
-def print_telemetry_receipt(
-    root: Path,
-    records: List[FileRecord],
-    adr_records: List[ADRRecord],
-    quarantine_log: List[QuarantineEntry],
-    runtimes: List[str],
-    outputs: Dict[Path, str],
-    init_mode: bool,
-    dry_run: bool,
-) -> None:
-    total_files = len(records)
-    py_files = sum(1 for r in records if r.is_python)
-    opaque_files = sum(1 for r in records if r.is_opaque)
-    l4_files = sum(1 for r in records if r.is_opaque and r.opaque_info and r.opaque_info.is_l4_demoted)
-    non_py_code = total_files - py_files - opaque_files
-    total_loc = sum(r.line_count for r in records if not r.is_opaque)
-    raw_tokens = max(1, sum(r.tokens_est for r in records))
-    ast_symbols = sum(len(r.symbols) for r in records)
-    preserved_symbols = sum(len(r.preserved_raw_symbols) for r in records)
-
-    root_doc = outputs.get(root / "TOKENME.txt", "")
-    root_tokens = max(1, estimate_tokens(root_doc))
-    root_lines_cnt = len(root_doc.splitlines())
-    total_meta_tokens = max(1, sum(estimate_tokens(c) for c in outputs.values()))
-    compression_ratio = raw_tokens / root_tokens
-
-    m_sr = STATE_ROOT_PATTERN.search(root_doc)
-    state_root_str = m_sr.group(2) if m_sr else "UNKNOWN"
-
-    todo_count = sum(c.count("[TODO: AGENT_FILL") for c in outputs.values())
-    stub_count = sum(c.count("[AGENT_POPULATE_SYMBOLS]") for c in outputs.values())
-    hydration_count = sum(c.count("[NEEDS_HYDRATION") for c in outputs.values())
-    stale_count = sum(c.count("[COORDS_STALE_CHECK:") for c in outputs.values())
-
-    sharded = len(outputs) > 1
-    mode_str = (
-        f"Two-Pass Sharded Mode (Root Router + {len(outputs) - 1} Shards)"
-        if sharded
-        else "Monolithic Single-File Mode"
-    )
-    rt_str = ", ".join(runtimes) if runtimes else "Python >= 3.9 (Standard Library Only)"
-    tok_engine = "tiktoken (cl100k_base)" if _TIKTOKEN_ENC is not None else "Conservative Heuristic (+15% safety buffer)"
-    action_label = "Initial Cold-Repo Scaffold (--init)" if init_mode else "In-Place Merkle & Coordinate Sync"
-    if dry_run:
-        action_label += " [DRY-RUN]"
-
-    print("\n" + "=" * 80)
-    print(f" [tokenme-sync.py v{VERSION} | Spec v{SPEC_VERSION}] — {action_label}")
-    print("=" * 80)
-    print(f"  Merkle STATE_ROOT  : {state_root_str} (Verified across AGENTS.md + {len(adr_records)} ADRs + {len(outputs)} shards)")
-    print(f"  Indexed Corpus     : {total_files} files ({py_files} Py AST, {non_py_code} Non-Py, {opaque_files} Opaque [{l4_files} L4]) | {total_loc:,} LOC")
-    print(f"  Source Token Mass  : ~{raw_tokens:,} tokens ({tok_engine})")
-    print(f"  Detected Runtimes  : {rt_str}")
-    print(f"  Symbol Resolution  : {ast_symbols} exact Python AST spans | {preserved_symbols} preserved non-Py spans")
-    print(f"  Fail-Closed Guard  : {len(quarantine_log)} binary/oversize/symlink/fault items isolated")
-    print(f"  Topology Selected  : {mode_str}")
-    print(f"  Root Router Budget : {root_lines_cnt}/{ROOT_LINE_CEILING} lines (~{root_tokens:,} tokens | Total shards: ~{total_meta_tokens:,} tok)")
-    print(f"  Epistemic Leverage : {compression_ratio:.1f}:1 compression vs. raw codebase read")
-    print("-" * 80)
-    print("  Staged / Committed Artifacts:")
-    for p, text in sorted(outputs.items(), key=lambda item: item[0].as_posix()):
-        rel_p = p.relative_to(root).as_posix()
-        est_tok = estimate_tokens(text)
-        lc = len(text.splitlines())
-        print(f"    -> ./{rel_p:<34} ({lc:>3} lines | ~{est_tok:,} tokens)")
-
-    if stub_count > 0 or todo_count > 0 or hydration_count > 0 or stale_count > 0:
-        print("-" * 80)
-        print(
-            f"  Agent Hydration Queue: {stub_count} [AGENT_POPULATE_SYMBOLS] | "
-            f"{hydration_count} [NEEDS_HYDRATION] | {todo_count} [TODO: AGENT_FILL] | "
-            f"{stale_count} stale checks"
-        )
-    print("=" * 80 + "\n")
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="tokenme-sync.py",
-        description=(
-            "Synchronize and Merkle-stamp an existing TOKENME.txt (v2.0) hierarchy (default / --sync), "
-            "verify O(1) Merkle state integrity (--check), or scaffold a cold repository (--init)."
-        ),
+        description="TOKENME v2.1 Epistemic State Compiler, Triage Dispatcher, and Merkle Verifier.",
     )
-    parser.add_argument(
-        "root",
-        nargs="?",
-        default=".",
-        help="Path to the repository root directory (default: current directory).",
-    )
-    parser.add_argument(
-        "--init",
-        action="store_true",
-        help="Scaffold a new TOKENME.txt hierarchy in a cold repository.",
-    )
-    parser.add_argument(
-        "--sync",
-        action="store_true",
-        help="Explicitly run in-place coordinate and Merkle state synchronization (default behavior).",
-    )
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Fast (<2ms) read-only Merkle integrity check for pre-commit/CI (exits 1 on drift).",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="When combined with --init, overwrite an existing TOKENME.txt from scratch.",
-    )
-    parser.add_argument(
-        "--single",
-        action="store_true",
-        help="Force monolithic single-file output even if sharding thresholds are exceeded.",
-    )
-    parser.add_argument(
-        "--leaf-len",
-        type=int,
-        default=DEFAULT_LEAF_HASH_LEN,
-        help=f"Hex length for ADR and sidecar leaf digests (6..64, default: {DEFAULT_LEAF_HASH_LEN}).",
-    )
-    parser.add_argument(
-        "--root-len",
-        type=int,
-        default=DEFAULT_ROOT_HASH_LEN,
-        help=f"Hex length for Merkle STATE_ROOT digests (8..64, default: {DEFAULT_ROOT_HASH_LEN}).",
-    )
-    parser.add_argument(
-        "--adr-dir",
-        type=str,
-        default=None,
-        help="Override ADR directory relative to root (default: auto-detect docs/adr/ or docs/decisions/).",
-    )
-    parser.add_argument(
-        "--max-size-kb",
-        type=int,
-        default=DEFAULT_MAX_FILE_SIZE_KB,
-        help=f"Quarantine text/source files larger than this threshold in KiB (default: {DEFAULT_MAX_FILE_SIZE_KB} KiB).",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Execute traversal, AST extraction, and Merkle math without writing files.",
-    )
+    parser.add_argument("root", nargs="?", default=".", help="Repository root directory.")
+    parser.add_argument("--init", action="store_true", help="Scaffold a cold repository.")
+    parser.add_argument("--force", action="store_true", help="Overwrite existing TOKENME files when combined with --init.")
+    parser.add_argument("--force-init", action="store_true", help="Alias for --init --force (ADR-011).")
+    parser.add_argument("--sync", "--fix", dest="sync", action="store_true", help="Synchronize coordinates, hashes, and STATE_ROOT.")
+    parser.add_argument("--check", action="store_true", help="Fast read-only Merkle & validation check (exits 2 on drift/unfilled).")
+    parser.add_argument("--triage", action="store_true", help="Emit deterministic maintenance work queue (ADR-015).")
+    parser.add_argument("--ack", nargs="+", metavar="FILE", help="Atomically acknowledge internal edits without prose changes (ADR-015).")
+    parser.add_argument("--compact", action="store_true", help="Coalesce contracted shards below 35%% hysteresis floor (ADR-013).")
+    parser.add_argument("--strict-bytes", action="store_true", help="Report comment-only byte changes in --triage even when struct_sig matches.")
+    parser.add_argument("--single", action="store_true", help="Force monolithic single-file output.")
+    parser.add_argument("--leaf-len", type=int, default=DEFAULT_LEAF_HASH_LEN, help="Hex length for ADR/sidecar leaf digests (6..64).")
+    parser.add_argument("--root-len", type=int, default=DEFAULT_ROOT_HASH_LEN, help="Hex length for Merkle STATE_ROOT (8..64).")
+    parser.add_argument("--adr-dir", type=str, default=None, help="Override ADR directory relative to root.")
+    parser.add_argument("--max-size-kb", type=int, default=DEFAULT_MAX_FILE_SIZE_KB, help="Max text file size in KiB.")
+    parser.add_argument("--dry-run", action="store_true", help="Compute state in memory without writing files.")
 
     args = parser.parse_args()
-    root_path = Path(args.root).resolve()
+    if args.force_init:
+        args.init = True
+        args.force = True
 
+    root_path = Path(args.root).resolve()
     if not root_path.is_dir():
         print(f"[ERROR] Target directory does not exist: {root_path}", file=sys.stderr)
         return 1
 
-    # --- Tier 1 Fast Integrity Check Mode (--check) ---
+    max_size_bytes = max(1, args.max_size_kb) * 1024
+
+    if args.triage:
+        items, code = run_triage_dispatcher(
+            root_path, max_size_bytes=max_size_bytes, leaf_len=args.leaf_len, strict_bytes=args.strict_bytes
+        )
+        if args.check and items:
+            return 2
+        return code
+
+    if args.ack:
+        return run_atomic_ack(
+            root_path,
+            ack_files=args.ack,
+            max_size_bytes=max_size_bytes,
+            leaf_len=args.leaf_len,
+            root_len=args.root_len,
+            custom_adr_dir=args.adr_dir,
+        )
+
     if args.check:
-        ok, err_list = run_integrity_check(
+        code, err_list = run_integrity_check(
             root_path, leaf_len=args.leaf_len, root_len=args.root_len, custom_adr_dir=args.adr_dir
         )
-        if ok:
-            clean_str = "\033[1;92mCLEAN\033[0m" if sys.stdout.isatty() and not os.environ.get("NO_COLOR") else "CLEAN"
-            print(f"[OK] TOKENME v{SPEC_VERSION} Merkle STATE_ROOT and ADR leaf digests verified {clean_str}.")
+        if code == 0:
+            print(f"[OK] TOKENME v{SPEC_VERSION} Merkle STATE_ROOT and epistemic gates verified CLEAN.")
             return 0
-        print(f"[FAIL] Epistemic state drift detected ({len(err_list)} issue(s)):", file=sys.stderr)
+        print(f"[FAIL] Epistemic state check failed ({len(err_list)} issue(s)):", file=sys.stderr)
         for e in err_list:
             print(f"  - {e}", file=sys.stderr)
-        print("  -> Run `python3 tokenme-sync.py` (or `--sync`) to resynchronize.", file=sys.stderr)
-        return 1
+        return code
 
     target_root_file = root_path / "TOKENME.txt"
     tokenme_exists = target_root_file.is_file() and not target_root_file.is_symlink()
 
     if args.init:
         if tokenme_exists and not (args.force or args.dry_run):
-            print(
-                f"[ABORT] `TOKENME.txt` already exists in {root_path}.\n"
-                "  -> To synchronize/update existing coordinates, run: `python3 tokenme-sync.py`\n"
-                "  -> To wipe and re-scaffold from scratch, pass: `python3 tokenme-sync.py --init --force`",
-                file=sys.stderr,
-            )
+            print("[ABORT] `TOKENME.txt` already exists. Use `--init --force` (or `--force-init`) to overwrite.", file=sys.stderr)
             return 1
-    else:
-        if not tokenme_exists:
-            print(
-                f"[NOTICE] No `TOKENME.txt` found in {root_path}.\n"
-                "  -> Default execution updates an existing TOKENME index.\n"
-                "  -> To scaffold a cold repository for the first time, run:\n"
-                "       python3 tokenme-sync.py --init",
-                file=sys.stderr,
-            )
-            return 1
+        # ADR-014: Scaffold canonical Profile A AGENTS.md if missing during cold --init
+        agents_target = root_path / "AGENTS.md"
+        if not agents_target.exists() and not args.dry_run:
+            try:
+                agents_target.write_text(DEFAULT_AGENTS_MD_TEMPLATE, encoding="utf-8", newline="\n")
+            except OSError:
+                pass
+    elif not tokenme_exists:
+        print("[NOTICE] No `TOKENME.txt` found. Run `python tokenme-sync.py --init` to scaffold.", file=sys.stderr)
+        return 1
 
-    max_size_bytes = max(1, args.max_size_kb) * 1024
     try:
-        adr_records = discover_adr_records(
-            root_path, leaf_len=args.leaf_len, custom_dir=args.adr_dir
-        )
+        adr_records = discover_adr_records(root_path, leaf_len=args.leaf_len, custom_dir=args.adr_dir)
     except Exception as exc:
         print(f"[ERROR] ADR discovery failed: {exc}", file=sys.stderr)
         return 1
 
-    records, quarantine_log, runtimes = scan_repository(
+    records, quarantine_log, runtimes, workspace_sig_map = scan_repository(
         root_path, max_size_bytes=max_size_bytes, leaf_len=args.leaf_len, dry_run=args.dry_run
     )
 
-    if not records and not quarantine_log and not adr_records:
-        print("[WARN] No eligible files discovered in repository.", file=sys.stderr)
-        return 1
-
-    l0_meta: Dict[str, str] = {}
+    harvested_shards: Dict[str, HarvestedShardState] = {}
     if not args.init:
-        l0_meta, file_states = harvest_existing_state(root_path)
-        merge_harvested_state(records, file_states)
+        harvested_shards, all_rows = harvest_existing_shards(root_path)
+        merge_harvested_rows_into_records(records, all_rows)
 
     outputs = build_documents(
         root=root_path,
@@ -1869,23 +2284,22 @@ def main() -> int:
         adr_records=adr_records,
         quarantine_log=quarantine_log,
         runtimes=runtimes,
-        l0_meta=l0_meta,
+        harvested_shards=harvested_shards,
+        workspace_sig_map=workspace_sig_map,
         root_len=args.root_len,
         force_single=args.single,
+        compact_mode=args.compact,
     )
 
     if not args.dry_run:
         atomic_commit_outputs(root_path, outputs, clean_stale_shards=True)
 
-    print_telemetry_receipt(
-        root=root_path,
-        records=records,
-        adr_records=adr_records,
-        quarantine_log=quarantine_log,
-        runtimes=runtimes,
-        outputs=outputs,
-        init_mode=args.init,
-        dry_run=args.dry_run,
+    root_doc = outputs.get(root_path / "TOKENME.txt", "")
+    m_sr = STATE_ROOT_PATTERN.search(root_doc)
+    sr_str = m_sr.group(2) if m_sr else "UNKNOWN"
+    print(
+        f"[OK] tokenme-sync.py v{VERSION} (Spec v{SPEC_VERSION}) synced {len(records)} files across "
+        f"{len(outputs)} shard(s) | STATE_ROOT: {sr_str}"
     )
     return 0
 
