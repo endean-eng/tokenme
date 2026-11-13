@@ -1809,7 +1809,8 @@ def main() -> int:
             root_path, leaf_len=args.leaf_len, root_len=args.root_len, custom_adr_dir=args.adr_dir
         )
         if ok:
-            print(f"[OK] TOKENME v{SPEC_VERSION} Merkle STATE_ROOT and ADR leaf digests verified clean.")
+            clean_str = "\033[1;92mCLEAN\033[0m" if sys.stdout.isatty() and not os.environ.get("NO_COLOR") else "CLEAN"
+            print(f"[OK] TOKENME v{SPEC_VERSION} Merkle STATE_ROOT and ADR leaf digests verified {clean_str}.")
             return 0
         print(f"[FAIL] Epistemic state drift detected ({len(err_list)} issue(s)):", file=sys.stderr)
         for e in err_list:
