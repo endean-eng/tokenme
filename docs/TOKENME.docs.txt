@@ -1,0 +1,32 @@
+# TOKENME_VERSION: 2.1
+# STATE_ROOT: fccd582f
+# ADR_COUNT: 16
+
+# === [PURPOSE] ===
+# [BOOTSTRAP_REQUIRED: POPULATE_PURPOSE | SCOPE=docs/ | MAX_BYTES=270 | Write 3 lines: SYSTEM:, BOUNDARY:, RUNTIME: then run `python tokenme-sync.py` to lock [#sig] and self-consume this prompt]
+SYSTEM: [BOOTSTRAP_REQUIRED]
+BOUNDARY: [BOOTSTRAP_REQUIRED]
+RUNTIME: Python >= 3.9 (Standard Library Only)
+
+# === [TOPOLOGY] ===
+# [BOOTSTRAP_REQUIRED: POPULATE_TOPOLOGY | SCOPE=docs/ | TARGET_EDGES=2..6 | MAX_BYTES=504 | Format: `<src_file>::<anchor> -> <dst_file>::<anchor> : <mechanism>`]
+
+# === [FILES] ===
+| Path & Span | Archetype & Budget | Hash (`content:struct`) | Deterministic AST / Structural Signature | Declarative Role & Invariants |
+| :--- | :--- | :--- | :--- | :--- |
+| `docs/decisions/ADR-001_2026-11-08_Separation-Context-Triad.md` `[L1-L21]` | `SPEC_DOC` (<=88 B) | `d63d145e:a4799b` | `secs=ADR-001: Separation of the R, 1. Context and Problem State, 2. Decision, 3. Consequences` | Orthogonalizes README.md, AGENTS.md, and TOKENME.txt by modality. |
+| `docs/decisions/ADR-002_2026-11-08_Plain-Text-Coordinate.md` `[L1-L32]` | `SPEC_DOC` (<=88 B) | `b5d158b4:036657` | `secs=ADR-002: Plain-Text `.txt` E, 1. Context and Problem State, 2. Decision Drivers, 3. Decision, A. Intentional Selection of ...` | [BOOTSTRAP_REQUIRED] |
+| `docs/decisions/ADR-003_2026-11-09_Hierarchical-Mimap-Sharding.md` `[L1-L26]` | `SPEC_DOC` (<=88 B) | `62ee1eb5:6b4e88` | `secs=ADR-003: Hierarchical Mipmap, 1. Context and Problem State, 2. Decision, 3. Consequences` | Establishes L0-L3 Mipmap resolution tiers and subdirectory sharding. |
+| `docs/decisions/ADR-004_2026-11-10_Vertical-Domain-Sharding.md` `[L1-L26]` | `SPEC_DOC` (<=88 B) | `876196df:c6078d` | `secs=ADR-004: Vertical Domain Sha, Context and Problem Statemen, Decision Drivers, Decision Outcome, Consequences` | Defines vertical domain sharding and >75 symbol split threshold. |
+| `docs/decisions/ADR-005_2026-11-10_Canonical-Symbol-Ownership.md` `[L1-L31]` | `SPEC_DOC` (<=88 B) | `9c0f032b:2e9484` | `secs=ADR-005: Canonical Symbol Ow, Context and Problem Statemen, Decision Drivers, Decision Outcome, Consequences` | Enforces qualified Class.method scoping and canonical symbol ownership. |
+| `docs/decisions/ADR-006_2026-11-10_Scaffolder-Functional-Boundaries.md` `[L1-L48]` | `SPEC_DOC` (<=88 B) | `ffa9a8ce:1b4197` | `secs=ADR-006: Reference Scaffolde, 1. Context & Problem Stateme, 2. Decision, Invariant 1: Strict Python S, Invariant 2: Exact AST Where...` | Mandates Python stdlib-only scaffolder and fail-closed quarantine. |
+| `docs/decisions/ADR-007_2026-11-11_Hierarchical-Delimiter-Taxonomy.md` `[L1-L54]` | `SPEC_DOC` (<=88 B) | `b73012e0:d2e384` | `secs=ADR-007: Hierarchical Delimi, 1. Context & Problem Stateme, 2. Decision & Governing Mech, Formal EBNF Grammar, Structural Invariants...` | Defines 3-tuple RecordID_ISODate_TitleSlug.md filename grammar. |
+| `docs/decisions/ADR-008_2026-11-11_Multi-Tier-Merkle.md` `[L1-L180]` | `SPEC_DOC` (<=138 B) | `ec4a1bed:20038c` | `secs=ADR-008: Multi-Tier Merkle E, 1. Context and Problem State, 2. Decision, 2.1 Canonical Byte Normaliza, 2.2 Tier 1: Advisory File Di...` | Specifies CRLF-invariant Multi-Tier Merkle STATE_ROOT rollup and --check. |
+| `docs/decisions/ADR-009_2026-11-11_Opaque-L4-Sidecars.md` `[L1-L225]` | `SPEC_DOC` (<=155 B) | `4747bb55:b2c06e` | `secs=ADR-009: Opaque & Vector Ass, 1. Context & Problem Stateme, 2. Decision, Part A: The Gated Opaque & V, Part B: Modality-Weighted `O...` | [BOOTSTRAP_REQUIRED] |
+| `docs/decisions/ADR-010_2026-11-11_Ledger-Harmonization-Supersession.md` `[L1-L102]` | `SPEC_DOC` (<=103 B) | `7e03967d:87e399` | `secs=ADR-010: Ledger Harmonizatio, 1. Context and Problem State, 2. Decision: Authoritative S, 3. Canonical Constants, Dire, 3.1 Harmonized Sharding Thre...` | Reconciles ADR-001..009 collisions, PNG IHDR slices, and .l3.txt errata. |
+| `docs/decisions/ADR-011_2026-11-12_Bootstrap-Prompts-Polymorphic.md` `[L1-L202]` | `SPEC_DOC` (<=134 B) | `f5eaa9f6:7c0b8f` | `secs=ADR-011: Self-Consuming Boot, 1. Context & Problem Stateme, 2. Decision & Governing Mech, 2.1 In-Place Self-Consuming , State $T=0$ Template (Emitte...` | [BOOTSTRAP_REQUIRED] |
+| `docs/decisions/ADR-012_2026-11-13_Hop-Relaxation-Cascade.md` `[L1-L228]` | `SPEC_DOC` (<=152 B) | `070e14f9:8010c1` | `secs=ADR-012:2026-11-13:Clamped H, 1. Context & Problem Stateme, 2. Decision Drivers & Mathem, 2.1 Expected Session Cost vs, 2.2 The Clamped Linear Hop-R...` | Derives clamped hop-distance threshold curve S_trigger(d) and split gates. |
+| `docs/decisions/ADR-013_2026-11-13_Hysteresis-Compaction-Guardbands.md` `[L1-L141]` | `SPEC_DOC` (<=130 B) | `20bba303:2a0ac9` | `secs=ADR-013: Hysteresis-Gated Sh, 1. Context & Problem Stateme, 1.1 Asymmetric Repository Gr, 1.2 Cross-Model Tokenizer Va, 2. Decision & Governing Mech...` | Establishes 35% hysteresis merge floor, --compact, and 2.8 B/tok guardbands. |
+| `docs/decisions/ADR-014_2026-11-13_Declarative-Maintenance-Profiles.md` `[L1-L173]` | `SPEC_DOC` (<=127 B) | `dce5ae07:dfd162` | `secs=ADR-014: Declarative Mainten, 1. Context & Problem Stateme, 2. Decision & Governing Mech, 2.1 Tokenomic Crossover Deri, 2.2 Execution Profile Specif...` | Defines Profile A (Cold Triage) vs Profile B (<=35k write-back) and isolation. |
+| `docs/decisions/ADR-015_2026-11-13_Deterministic-Agent-Triage.md` `[L1-L200]` | `SPEC_DOC` (<=148 B) | `5b55cb7f:a735e8` | `secs=ADR-015: Deterministic Agent, 1. Context & Problem Stateme, 2. Decision & Governing Mech, 2.1 The Three-State Triage T, 2.2 Canonical `--triage` Std...` | [BOOTSTRAP_REQUIRED] |
+| `docs/decisions/ADR-016_2026-11-13_Spec-Harmony-Triage.md` `[L1-L2313]` | `SPEC_DOC` (<=298 B) | `3b723559:25ac74` | `secs=ADR-016: TOKENME v2.1 Specif, 1. Context & Problem Stateme, 2. Decision & Harmonized Gov, 2.1 Resolution HC-01: Canoni, 2.2 Resolution HC-02: Dual-H...` | Harmonizes v2.1 spec: 5-column [FILES] table, Dual-Hash Auto-Ack, and errata. |

@@ -1,6 +1,6 @@
 # ADR-016: TOKENME v2.1 Specification Harmonization, Unified Manifest Schema, and Triage/Hysteresis Errata
 
-* **Status:** Proposed
+* **Status:** Implemented
 * **Date:** 2026-11-13
 * **Author:** Elijah N. Dean, BSME (`endean-eng` / Dean Innovative Design LLC)
 * **Target Specification:** `TOKENME` v2.1 & `tokenme-sync.py` (v2.1.0)

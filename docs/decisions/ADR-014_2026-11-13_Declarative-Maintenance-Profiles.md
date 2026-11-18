@@ -1,6 +1,6 @@
 # ADR-014: Declarative Maintenance Execution Profiles and Single-State Instruction Isolation
 
-* **Status:** Proposed
+* **Status:** Implemented (Ammended by ADR-016)
 * **Date:** 2026-11-13
 * **Author:** Elijah N. Dean, BSME (`endean-eng` / Dean Innovative Design LLC)
 * **Target Specification:** `TOKENME` v2.0

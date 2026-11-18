@@ -1,6 +1,6 @@
 # ADR-011: Self-Consuming Bootstrap Prompts, Polymorphic Structural Hashing, and Tiered Token Budgets
 
-* **Status:** Proposed
+* **Status:** Implemented (Ammended by ADR-016)
 * **Date:** 2026-11-12
 * **Author:** Elijah N. Dean, BSME (`endean-eng` / Dean Innovative Design LLC)
 * **Target Specification:** `TOKENME` v2.0 & `tokenme-sync.py` CLI

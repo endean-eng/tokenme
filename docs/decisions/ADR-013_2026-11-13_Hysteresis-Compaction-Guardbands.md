@@ -1,7 +1,7 @@
 <!-- Target Path: docs/decisions/ADR-013_2026-11-13_Hysteresis-Shard-Compaction-And-Byte-Bounded-Guardbands.md -->
 # ADR-013: Hysteresis-Gated Shard Compaction and Cross-Model Byte-Bounded Token Guardbands
 
-* **Status:** Proposed
+* **Status:** Implemented (Ammended by ADR-016)
 * **Date:** 2026-11-13
 * **Author:** Elijah N. Dean, BSME (`endean-eng` / Dean Innovative Design LLC)
 * **Target Specification:** `TOKENME` v2.0 (Hierarchical Sharding & Deterministic Sync Engine)

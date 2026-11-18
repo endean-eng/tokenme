@@ -2,7 +2,7 @@
 record_id: ADR-012
 title: Clamped Hop-Distance Threshold Relaxation & Cascade Sharding Guards
 date: 2026-11-13
-status: PROPOSED
+status: Implemented (Ammended by ADR-016)
 authors:
   - Elijah N. Dean
 supersedes: []
